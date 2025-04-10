@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { SigningStargateClient, StargateClient } from '@cosmjs/stargate';
 import * as bip39 from 'bip39';
@@ -122,7 +122,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex justify-center items-center h-screen bg-green-100 px-3">
+    <div className="flex justify-center items-center h-screen bg-green-100 px-3 py-10 overflow-y-auto">
       {/* <div className="w-full h-full justify-center flex flex-col items-center bg-white shadow-lg rounded-lg p-6"> */}
         {step === 'welcome' && (
           <div className=''>
@@ -136,7 +136,7 @@ export default function App() {
         )}
 
         {step === 'new' && (
-          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5">
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5 bg-gray-100">
             {/* <h2 className="text-xl font-bold text-indigo-700">Your Mnemonic Phrase</h2> */}
             <h2 className="text-2xl text-shadow-md font-bold text-slate-900">Your Secret Phrase</h2>
             <textarea className="rounded-md border-2 border-slate-600 outline-none p-3 font-semibold" rows={3} readOnly value={mnemonic} />
@@ -156,7 +156,7 @@ export default function App() {
         )}
 
         {step === 'confirm' && (
-          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5">
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5 bg-gray-100">
             <h2 className="text-2xl text-shadow-md font-bold text-slate-900">Confirm Your Mnemonic</h2>
             <textarea className="rounded-md border-2 border-slate-600 outline-none p-3 font-semibold" rows={3} value={confirmedMnemonic} onChange={(e) => setConfirmedMnemonic(e.target.value)} />
             <button onClick={confirmMnemonic} className="bg-slate-900 text-white font-semibold py-2 rounded-md hover:bg-black duration-200 w-full mt-3 cursor-pointer">Confirm</button>
@@ -164,7 +164,7 @@ export default function App() {
         )}
 
         {step === 'import' && (
-          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5">
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5 bg-gray-100">
             <h2 className="text-2xl text-shadow-md font-bold text-slate-900">Paste Mnemonic to Import Wallet</h2>
             <textarea className="rounded-md border-2 border-slate-600 outline-none p-3 font-semibold" rows={3} value={confirmedMnemonic} onChange={(e) => setConfirmedMnemonic(e.target.value)} />
             <button onClick={importWallet} className="bg-slate-900 text-white font-semibold py-2 rounded-md hover:bg-black duration-200 w-full mt-3 cursor-pointer">Import</button>
@@ -172,16 +172,16 @@ export default function App() {
         )}
 
         {step === 'dashboard' && (
-          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5">
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5 bg-gray-100">
             <h2 className="text-2xl text-shadow-md font-bold text-slate-900">Dashboard</h2>
             <p className="text-sm"><strong>Address:</strong> {address}</p>
             <p className="text-sm mb-4"><strong>Balance:</strong> {balance} {DISPLAY_DENOM}</p>
 
             <div className="border-t pt-4 flex flex-col gap-3">
               <h3 className="font-bold mb-1 text-indigo-700">Send</h3>
-              <p className="text-xs text-gray-500 mb-1">Available: {balance} {DISPLAY_DENOM}</p>
-              <input type="text" className="input" placeholder="Recipient address" value={to} onChange={(e) => setTo(e.target.value)} />
-              <input type="number" className="input" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <input type="text" className="px-3 border-b-2 shadow-sm border-slate-800 rounded-md h-12 outline-none" placeholder="Recipient address" value={to} onChange={(e) => setTo(e.target.value)} />
+              <p className="text-xs text-gray-500 mb-1 mt-5 text-right">Available: {balance} {DISPLAY_DENOM}</p>
+              <input type="number" className="px-3 border-b-2 shadow-sm border-slate-800 rounded-md h-12 outline-none" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
               <button onClick={sendTokens} className="bg-slate-900 text-white font-semibold py-2 rounded-md hover:bg-black duration-200 w-full mt-3 cursor-pointer">Send</button>
             </div>
 
