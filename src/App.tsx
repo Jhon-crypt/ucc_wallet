@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
-import { SigningStargateClient, StargateClient } from '@cosmjs/stargate';
+import { SigningStargateClient } from '@cosmjs/stargate';
 import * as bip39 from 'bip39';
 import QRCode from 'qrcode';
 import { Buffer } from 'buffer';
@@ -12,6 +12,7 @@ import { toast, Toaster } from 'sonner';
 const RPC = 'https://evmos-rpc.publicnode.com';
 const DENOM = 'aevmos';
 const DISPLAY_DENOM = 'UCC';
+const LCD = 'http://145.223.80.193:1317';
 
 export default function App() {
   const [step, setStep] = useState<'welcome' | 'new' | 'confirm' | 'import' | 'dashboard'>('welcome');
@@ -27,7 +28,7 @@ export default function App() {
 
   const generateWallet = async () => {
     const mnemonic = bip39.generateMnemonic();
-    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, { prefix: 'evmos' });
+    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, { prefix: 'UCC' });
     const [account] = await wallet.getAccounts();
     setMnemonic(mnemonic);
     setWallet(wallet);
@@ -37,7 +38,7 @@ export default function App() {
 
   const confirmMnemonic = async () => {
     if (confirmedMnemonic.trim() === mnemonic.trim()) {
-      const wallet = await DirectSecp256k1HdWallet.fromMnemonic(confirmedMnemonic, { prefix: 'evmos' });
+      const wallet = await DirectSecp256k1HdWallet.fromMnemonic(confirmedMnemonic, { prefix: 'UCC' });
       const [account] = await wallet.getAccounts();
       setWallet(wallet);
       setAddress(account.address);
@@ -54,7 +55,7 @@ export default function App() {
       alert('Invalid mnemonic');
       return;
     }
-    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(confirmedMnemonic, { prefix: 'evmos' });
+    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(confirmedMnemonic, { prefix: 'UCC' });
     const [account] = await wallet.getAccounts();
     setMnemonic(confirmedMnemonic);
     setWallet(wallet);
@@ -64,14 +65,27 @@ export default function App() {
     setStep('dashboard');
   };
 
+  // const fetchBalance = async (addr: string) => {
+  //   try {
+  //     const client = await StargateClient.connect(RPC);
+  //     const result = await client.getBalance(addr, DENOM);
+  //     setBalance((+result.amount / 1_000_000).toFixed(4));
+  //   } catch (err) {
+  //     console.error('Failed to fetch balance:', err);
+  //     alert('Error fetching balance. Please check RPC connection.');
+  //   }
+  // };
+
   const fetchBalance = async (addr: string) => {
     try {
-      const client = await StargateClient.connect(RPC);
-      const result = await client.getBalance(addr, DENOM);
-      setBalance((+result.amount / 1_000_000).toFixed(4));
+      const res = await fetch(`${LCD}/cosmos/bank/v1beta1/balances/${addr}`);
+      const data = await res.json();
+      const balanceObj = data.balances.find((b: any) => b.denom === DENOM);
+      const amount = balanceObj ? (+balanceObj.amount / 1e18).toFixed(4) : '0';
+      setBalance(amount);
     } catch (err) {
-      console.error('Failed to fetch balance:', err);
-      alert('Error fetching balance. Please check RPC connection.');
+      console.error('Failed to fetch balance via LCD:', err);
+      alert('Error fetching balance via REST. Please check the LCD endpoint.');
     }
   };
 
@@ -86,12 +100,33 @@ export default function App() {
     const result = await client.sendTokens(
       address,
       to,
-      [{ denom: DENOM, amount: (parseFloat(amount) * 1_000_000).toFixed(0) }],
+      [{ denom: DENOM, amount: (parseFloat(amount) * 1e18).toFixed(0) }],
       'auto'
     );
     alert(`Sent! Tx Hash: ${result.transactionHash}`);
     fetchBalance(address);
   };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (step === 'dashboard') {
+        const confirmExit = window.confirm('Are you sure you want to exit app?');
+        if (!confirmExit) {
+          // Push user back to dashboard
+          history.pushState(null, '', window.location.href);
+        } else {
+          setStep('welcome');
+        }
+      }
+    };
+  
+    window.addEventListener('popstate', handlePopState);
+    history.pushState(null, '', window.location.href); // Prevent default back
+  
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [step]);  
 
   const downloadCSV = () => {
     toast.loading("Downloading CSV...");
@@ -125,9 +160,12 @@ export default function App() {
     <div className="flex justify-center items-center h-screen bg-green-100 px-3 py-10 overflow-y-auto">
       {/* <div className="w-full h-full justify-center flex flex-col items-center bg-white shadow-lg rounded-lg p-6"> */}
         {step === 'welcome' && (
-          <div className=''>
+          <div className='flex flex-col gap-5 items-center justify-center'>
+            <div className="rounded-full bg-white p-2">
+              <img src="/logo.png" alt="Logo" className='w-full md:w-[400px]' />
+            </div>
             <h1 className="text-4xl font-extrabold text-center ">Universe Wallet 🌌</h1>
-            <p className="text-center text-sm text-gray-500">Decentralised Web Wallet</p>
+            <p className="text-center text-lg font-semibold text-gray-500">Decentralised Web Wallet</p>
             <div className="flex gap-3 mt-6">
               <button onClick={generateWallet} className="bg-slate-900 text-white px-4 py-2 rounded-md hover:bg-slate-800 duration-200 cursor-pointer outline-none font-semibold shadow-sm">Create New Wallet</button>
               <button onClick={() => setStep('import')} className="border-2 border-slate-900 rounded-md px-4 py-2 bg-transparent text-slate-900 cursor-pointer font-semibold shadow-sm hover:bg-gray-50/20 duration-200">Import Existing Wallet</button>
