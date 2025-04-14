@@ -180,19 +180,52 @@ export default function App() {
     toast.success("Address copied to clipboard!");
   }
 
+  const showComingSoon = () => {
+    toast('Coming soon!', {
+      description: 'This feature is under development.',
+      icon: '🚧',
+      duration: 2000,
+    });
+  };
+  
   return (
-    <div className="flex justify-center items-center h-screen bg-green-100 px-3 py-10 overflow-y-auto">
+    <div className="flex justify-center items-center h-screen bg-white px-2 py-10 overflow-y-hidden">
       {/* <div className="w-full h-full justify-center flex flex-col items-center bg-white shadow-lg rounded-lg p-6"> */}
         {step === 'welcome' && (
-          <div className='flex flex-col gap-5 items-center justify-center'>
-            <div className="rounded-full bg-white p-2">
-              <img src="/logo.png" alt="Logo" className='w-full md:w-[400px]' />
+          <div className='flex flex-col gap-5 items-center justify-center h-screen'>
+            <div className='flex flex-col gap-5 items-center justify-center h-screen'>
+              <div className="rounded-full bg-white p-3 border-2 border-black w-fit h-fit">
+                <img src="/logo.png" alt="Logo" className='w-[200px] md:w-[400px]' />
+              </div>
+              <h1 className="text-4xl font-extrabold text-center ">Universe Wallet</h1>
+              <p className="text-center text-lg font-semibold text-gray-500">Decentralised Web Wallet</p>
+              <div className="flex gap-3 mt-6">
+                <button onClick={generateWallet} className="bg-slate-900 text-white px-4 py-2 rounded-md hover:bg-slate-800 duration-200 cursor-pointer outline-none font-semibold shadow-sm">Create New Wallet</button>
+                <button onClick={() => setStep('import')} className="border-2 border-slate-900 rounded-md px-4 py-2 bg-transparent text-slate-900 cursor-pointer font-semibold shadow-sm hover:bg-gray-50/20 duration-200">Import Existing Wallet</button>
+              </div>
             </div>
-            <h1 className="text-4xl font-extrabold text-center ">Universe Wallet</h1>
-            <p className="text-center text-lg font-semibold text-gray-500">Decentralised Web Wallet</p>
-            <div className="flex gap-3 mt-6">
-              <button onClick={generateWallet} className="bg-slate-900 text-white px-4 py-2 rounded-md hover:bg-slate-800 duration-200 cursor-pointer outline-none font-semibold shadow-sm">Create New Wallet</button>
-              <button onClick={() => setStep('import')} className="border-2 border-slate-900 rounded-md px-4 py-2 bg-transparent text-slate-900 cursor-pointer font-semibold shadow-sm hover:bg-gray-50/20 duration-200">Import Existing Wallet</button>
+            <div className="mt-auto flex flex-col gap-5 justify-center items-center py-5">
+              <p className="text-lg font-medium text-center">Universe wallet is now the official cryptocurrency wallet of Universe Chain</p>
+              <div className="flex gap-5">
+                <button
+                  onClick={showComingSoon}
+                >
+                  <img
+                    src="Google.webp"
+                    alt="Play store"
+                    className="w-32 h-10 rounded-md"
+                  />
+                </button>
+                <button
+                  onClick={showComingSoon}
+                >
+                  <img
+                    src="Appstore.png"
+                    alt="Play store"
+                    className="w-32 h-10 rounded-md"
+                  />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -234,7 +267,7 @@ export default function App() {
         )}
 
         {step === 'dashboard' && (
-          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md p-5 bg-gray-100">
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md h-full overflow-y-auto p-5 bg-gray-100">
             <h2 className="text-2xl text-shadow-md font-bold text-slate-900">Dashboard</h2>
             <p className="text-sm"><strong>Address:</strong> {address}</p>
             <p className="text-sm mb-4"><strong>Balance:</strong> {balance} {DISPLAY_DENOM}</p>
