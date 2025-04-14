@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
-import { SigningStargateClient } from '@cosmjs/stargate';
+import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import * as bip39 from 'bip39';
 import QRCode from 'qrcode';
 import { Buffer } from 'buffer';
@@ -95,26 +95,39 @@ export default function App() {
   };
 
   const sendTokens = async () => {
-    if (!wallet || !to || !amount) return;
+    if (!wallet || !to || !amount) {
+      alert("Please fill in all fields before sending.");
+      return;
+    }
 
     try {
-      const client = await SigningStargateClient.connectWithSigner(RPC, wallet);
+      // Correct gas price as per your blockchain config
+      const gasPrice = GasPrice.fromString("0.00001atucc");
 
+      // Connect with signer and gas price
+      const client = await SigningStargateClient.connectWithSigner(RPC, wallet, {
+        gasPrice,
+      });
+
+      // Convert amount to 18 decimals
       const amountToSend = {
-        denom: DENOM,
-        amount: (parseFloat(amount) * 1e18).toFixed(0), // Use 18 decimals here
+        denom: "atucc",
+        amount: (parseFloat(amount) * 1e18).toFixed(0),
       };
 
-      const fee = 'auto'; // You can customize this if needed
+      // Send transaction
+      const result = await client.sendTokens(
+        address,
+        to,
+        [amountToSend],
+        "auto" // Let CosmJS calculate gas automatically
+      );
 
-      const result = await client.sendTokens(address, to, [amountToSend], fee);
-
-      alert(`Sent! Tx Hash: ${result.transactionHash}`);
-
+      alert(`✅ Sent! Tx Hash: ${result.transactionHash}`);
       fetchBalance(address); // Refresh balance
-    } catch (err) {
-      console.error('Send failed:', err);
-      alert('Failed to send tokens. Check console for details.');
+    } catch (err: any) {
+      console.error("Send failed:", err);
+      alert(`❌ Send failed: ${err.message || err}`);
     }
   };
 
