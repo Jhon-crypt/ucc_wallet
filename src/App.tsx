@@ -10,7 +10,7 @@ import { MdContentCopy, MdOutlineFileDownload } from "react-icons/md";
 import { toast, Toaster } from 'sonner';
 
 const RPC = 'https://evmos-rpc.publicnode.com';
-const DENOM = 'aevmos';
+const DENOM = 'atucc';
 const DISPLAY_DENOM = 'UCC';
 const LCD = 'http://145.223.80.193:1317';
 
@@ -81,7 +81,7 @@ export default function App() {
       const res = await fetch(`${LCD}/cosmos/bank/v1beta1/balances/${addr}`);
       const data = await res.json();
       const balanceObj = data.balances.find((b: any) => b.denom === DENOM);
-      const amount = balanceObj ? (+balanceObj.amount / 1e18).toFixed(4) : '0';
+      const amount = balanceObj ? (+balanceObj.amount / 1e18).toFixed(2) : '0';
       setBalance(amount);
     } catch (err) {
       console.error('Failed to fetch balance via LCD:', err);
@@ -96,15 +96,26 @@ export default function App() {
 
   const sendTokens = async () => {
     if (!wallet || !to || !amount) return;
-    const client = await SigningStargateClient.connectWithSigner(RPC, wallet);
-    const result = await client.sendTokens(
-      address,
-      to,
-      [{ denom: DENOM, amount: (parseFloat(amount) * 1e18).toFixed(0) }],
-      'auto'
-    );
-    alert(`Sent! Tx Hash: ${result.transactionHash}`);
-    fetchBalance(address);
+
+    try {
+      const client = await SigningStargateClient.connectWithSigner(RPC, wallet);
+
+      const amountToSend = {
+        denom: DENOM,
+        amount: (parseFloat(amount) * 1e18).toFixed(0), // Use 18 decimals here
+      };
+
+      const fee = 'auto'; // You can customize this if needed
+
+      const result = await client.sendTokens(address, to, [amountToSend], fee);
+
+      alert(`Sent! Tx Hash: ${result.transactionHash}`);
+
+      fetchBalance(address); // Refresh balance
+    } catch (err) {
+      console.error('Send failed:', err);
+      alert('Failed to send tokens. Check console for details.');
+    }
   };
 
   useEffect(() => {
@@ -164,7 +175,7 @@ export default function App() {
             <div className="rounded-full bg-white p-2">
               <img src="/logo.png" alt="Logo" className='w-full md:w-[400px]' />
             </div>
-            <h1 className="text-4xl font-extrabold text-center ">Universe Wallet 🌌</h1>
+            <h1 className="text-4xl font-extrabold text-center ">Universe Wallet</h1>
             <p className="text-center text-lg font-semibold text-gray-500">Decentralised Web Wallet</p>
             <div className="flex gap-3 mt-6">
               <button onClick={generateWallet} className="bg-slate-900 text-white px-4 py-2 rounded-md hover:bg-slate-800 duration-200 cursor-pointer outline-none font-semibold shadow-sm">Create New Wallet</button>
