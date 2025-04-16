@@ -6,13 +6,19 @@ import QRCode from 'qrcode';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
+import { StargateClient } from "@cosmjs/stargate";
+
+// import ethUtil from 'ethereumjs-util';
+// import { bech32 } from 'bech32';
+
 import { MdContentCopy, MdOutlineFileDownload } from "react-icons/md";
 import { toast, Toaster } from 'sonner';
 
 const RPC = 'https://evmos-rpc.publicnode.com';
 const DENOM = 'atucc';
 const DISPLAY_DENOM = 'UCC';
-const LCD = 'http://145.223.80.193:1317';
+// const LCD = 'http://145.223.80.193:1317';
+const LCD = 'http://145.223.80.193:26657';
 
 export default function App() {
   const [step, setStep] = useState<'welcome' | 'new' | 'confirm' | 'import' | 'dashboard'>('welcome');
@@ -65,34 +71,51 @@ export default function App() {
     setStep('dashboard');
   };
 
-  // const fetchBalance = async (addr: string) => {
-  //   try {
-  //     const client = await StargateClient.connect(RPC);
-  //     const result = await client.getBalance(addr, DENOM);
-  //     setBalance((+result.amount / 1_000_000).toFixed(4));
-  //   } catch (err) {
-  //     console.error('Failed to fetch balance:', err);
-  //     alert('Error fetching balance. Please check RPC connection.');
-  //   }
-  // };
-
   const fetchBalance = async (addr: string) => {
     try {
-      const res = await fetch(`${LCD}/cosmos/bank/v1beta1/balances/${addr}`);
-      const data = await res.json();
-      const balanceObj = data.balances.find((b: any) => b.denom === DENOM);
-      const amount = balanceObj ? (+balanceObj.amount / 1e18).toFixed(2) : '0';
+      const client = await StargateClient.connect(LCD); // RPC port
+      const result = await client.getBalance(addr, DENOM);
+      const amount = (parseFloat(result.amount) / 1e18).toFixed(2);
       setBalance(amount);
     } catch (err) {
-      console.error('Failed to fetch balance via LCD:', err);
-      alert('Error fetching balance via REST. Please check the LCD endpoint.');
+      console.error("Failed to fetch via RPC:", err);
     }
   };
+
+  // const fetchBalance = async (addr: string) => {
+  //   try {
+  //     const res = await fetch(`${LCD}/cosmos/bank/v1beta1/balances/${addr}`);
+  //     const data = await res.json();
+  //     const balanceObj = data.balances.find((b: any) => b.denom === DENOM);
+  //     const amount = balanceObj ? (+balanceObj.amount / 1e18).toFixed(2) : '0';
+  //     setBalance(amount);
+  //   } catch (err) {
+  //     console.error('Failed to fetch balance via LCD:', err);
+  //     alert('Error fetching balance via REST. Please check the LCD endpoint.');
+  //   }
+  // };
 
   const generateQR = async (data: string) => {
     const url = await QRCode.toDataURL(data);
     setQr(url);
   };
+
+  // function ethToUcc(eth: string) {
+  //   const addressBuffer = ethUtil.toBuffer(eth);
+
+  //   const words = bech32.toWords(addressBuffer);
+  //   const uccAddress = bech32.encode('ucc', words);
+
+  //   return uccAddress;
+  // }
+
+  // function uccToEth(uccAddress: string) {
+  //   const decoded = bech32.decode(uccAddress);
+  //   const addressBytes = Buffer.from(bech32.fromWords(decoded.words));
+  //   const ethAddress = '0x' + addressBytes.toString('hex');
+  //   return ethAddress;
+  // }
+  
 
   const sendTokens = async () => {
     if (!wallet || !to || !amount) {
@@ -101,15 +124,12 @@ export default function App() {
     }
 
     try {
-      // Correct gas price as per your blockchain config
       const gasPrice = GasPrice.fromString("0.00001atucc");
 
-      // Connect with signer and gas price
       const client = await SigningStargateClient.connectWithSigner(RPC, wallet, {
         gasPrice,
       });
 
-      // Convert amount to 18 decimals
       const amountToSend = {
         denom: "atucc",
         amount: (parseFloat(amount) * 1e18).toFixed(0),
