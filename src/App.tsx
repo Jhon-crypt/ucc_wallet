@@ -13,6 +13,8 @@ import { StargateClient } from "@cosmjs/stargate";
 
 import { MdContentCopy, MdOutlineFileDownload } from "react-icons/md";
 import { toast, Toaster } from 'sonner';
+import { BiUpArrowAlt, BiScan, BiCopy, BiArrowBack } from 'react-icons/bi';
+import DashboardTabs from './components/DashboardTabs';
 
 const RPC = 'https://evmos-rpc.publicnode.com';
 const DENOM = 'atucc';
@@ -21,7 +23,7 @@ const DISPLAY_DENOM = 'UCC';
 const LCD = 'http://145.223.80.193:26657';
 
 export default function App() {
-  const [step, setStep] = useState<'welcome' | 'new' | 'confirm' | 'import' | 'dashboard'>('welcome');
+  const [step, setStep] = useState<'welcome' | 'new' | 'confirm' | 'import' | 'dashboard' | 'send' | 'receive'>('dashboard');
   const [mnemonic, setMnemonic] = useState('');
   const [confirmedMnemonic, setConfirmedMnemonic] = useState('');
   const [wallet, setWallet] = useState<any>(null);
@@ -82,40 +84,17 @@ export default function App() {
     }
   };
 
-  // const fetchBalance = async (addr: string) => {
-  //   try {
-  //     const res = await fetch(`${LCD}/cosmos/bank/v1beta1/balances/${addr}`);
-  //     const data = await res.json();
-  //     const balanceObj = data.balances.find((b: any) => b.denom === DENOM);
-  //     const amount = balanceObj ? (+balanceObj.amount / 1e18).toFixed(2) : '0';
-  //     setBalance(amount);
-  //   } catch (err) {
-  //     console.error('Failed to fetch balance via LCD:', err);
-  //     alert('Error fetching balance via REST. Please check the LCD endpoint.');
-  //   }
-  // };
+  const truncateWalletAddress = (address: string) => {
+    if (address.length > 10) {
+      return `${address.slice(0, 5)}...${address.slice(-5)}`;
+    }
+    return address;
+  }
 
   const generateQR = async (data: string) => {
     const url = await QRCode.toDataURL(data);
     setQr(url);
   };
-
-  // function ethToUcc(eth: string) {
-  //   const addressBuffer = ethUtil.toBuffer(eth);
-
-  //   const words = bech32.toWords(addressBuffer);
-  //   const uccAddress = bech32.encode('ucc', words);
-
-  //   return uccAddress;
-  // }
-
-  // function uccToEth(uccAddress: string) {
-  //   const decoded = bech32.decode(uccAddress);
-  //   const addressBytes = Buffer.from(bech32.fromWords(decoded.words));
-  //   const ethAddress = '0x' + addressBytes.toString('hex');
-  //   return ethAddress;
-  // }
-  
 
   const sendTokens = async () => {
     if (!wallet || !to || !amount) {
@@ -287,21 +266,82 @@ export default function App() {
         )}
 
         {step === 'dashboard' && (
-          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[500px] rounded-md h-full overflow-y-auto p-5 bg-gray-100">
-            <h2 className="text-2xl text-shadow-md font-bold text-slate-900">Dashboard</h2>
-            <p className="text-sm"><strong>Address:</strong> {address}</p>
-            <p className="text-sm mb-4"><strong>Balance:</strong> {balance} {DISPLAY_DENOM}</p>
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[450px] rounded-md h-full overflow-y-auto bg-gray-100">
+            <div className="bg-white w-full shadow-md p-4 flex flex-col justify-center items-center gap-3">
+              <p className='font-extrabold text-lg'>Wallet</p>
+              <div className='text-center font-light text-gray-500 flex gap-4'><p className="my-auto">{truncateWalletAddress(address)}</p> <button onClick={copyAddress} className='my-auto cursor-pointer p-1'><BiCopy /></button></div>
+            </div>
+            <div className="flex flex-col gap-5 h-full overflow-y-auto px-5 pb-5 bg-gray-100">
+              <p className='text-4xl font-extrabold text-center mt-5'>{balance} {DISPLAY_DENOM}</p>
+              <div className="w-full justify-center flex gap-10 mt-5">
+                <div
+                  className="flex flex-col justify-center items-center"
+                >
+                  <button
+                    className="p-3 bg-slate-800 text-white rounded-full flex justify-center items-center w-fit h-fit hover:bg-slate-700 duration-200 cursor-pointer"
+                    onClick={() => setStep("send")}
+                  >
+                    <BiUpArrowAlt size={20} color='white' />
+                  </button>
+                  <p className='text-slate-800 font-semibold'>Send</p>
+                </div>
+                <div
+                  className="flex flex-col justify-center items-center"
+                >
+                  <button
+                    className="p-3 bg-slate-800 text-white rounded-full flex justify-center items-center w-fit h-fit hover:bg-slate-700 duration-200 cursor-pointer"
+                    onClick={() => setStep("receive")}
+                  >
+                    <BiScan size={20} color='white' />
+                  </button>
+                  <p className='text-slate-800 font-semibold'>Receive</p>
+                </div>
+              </div>
 
-            <div className="border-t pt-4 flex flex-col gap-3">
-              <h3 className="font-bold mb-1 text-indigo-700">Send</h3>
+              <DashboardTabs uccBalance={balance} />
+
+            </div>
+          </div>
+        )}
+        {step === "send" && (
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[450px] rounded-md h-full overflow-y-auto bg-gray-100">
+            <div className="bg-white w-full shadow-md p-4 flex flex-col justify-center items-center gap-3">
+              <p className='font-extrabold text-lg'>Wallet</p>
+              <div className='text-center font-light text-gray-500 flex gap-4'><p className="my-auto">{truncateWalletAddress(address)}</p> <button className='my-auto'><BiCopy /></button></div>
+            </div>
+            <div className="flex flex-col gap-5 h-full overflow-y-auto px-5 pb-5 bg-gray-100">
+              <div className="flex justify-between">
+                <button
+                  className='flex gap-2 cursor-pointer'
+                  onClick={() => setStep("dashboard")}
+                >
+                  <BiArrowBack className='my-auto' />
+                  <p className='font-semibold my-auto text-sm'>Back</p>
+                </button>
+              </div>
               <input type="text" className="px-3 border-b-2 shadow-sm border-slate-800 rounded-md h-12 outline-none" placeholder="Recipient address" value={to} onChange={(e) => setTo(e.target.value)} />
               <p className="text-xs text-gray-500 mb-1 mt-5 text-right">Available: {balance} {DISPLAY_DENOM}</p>
               <input type="number" className="px-3 border-b-2 shadow-sm border-slate-800 rounded-md h-12 outline-none" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
               <button onClick={sendTokens} className="bg-slate-900 text-white font-semibold py-2 rounded-md hover:bg-black duration-200 w-full mt-3 cursor-pointer">Send</button>
             </div>
-
-            <div className="border-t pt-4 flex flex-col gap-3">
-              <h3 className="font-bold mb-1 text-indigo-700">Receive</h3>
+          </div>
+        )}
+        {step === "receive" && (
+          <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[450px] rounded-md h-full overflow-y-auto bg-gray-100">
+            <div className="bg-white w-full shadow-md p-4 flex flex-col justify-center items-center gap-3">
+              <p className='font-extrabold text-lg'>Wallet</p>
+              <div className='text-center font-light text-gray-500 flex gap-4'><p className="my-auto">{truncateWalletAddress(address)}</p> <button className='my-auto'><BiCopy /></button></div>
+            </div>
+            <div className="flex flex-col gap-5 h-full overflow-y-auto px-5 pb-5 bg-gray-100">
+              <div className="flex justify-between">
+                <button
+                  className='flex gap-2 cursor-pointer'
+                  onClick={() => setStep("dashboard")}
+                >
+                  <BiArrowBack className='my-auto' />
+                  <p className='font-semibold my-auto text-sm'>Back</p>
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mb-1">Scan or copy your address</p>
               {qr && <img src={qr} className="w-32 mx-auto mb-2" />}
               <button onClick={copyAddress} className="bg-slate-900 text-white font-semibold py-2 rounded-md hover:bg-black duration-200 w-full mt-3 cursor-pointer">Copy Address</button>
