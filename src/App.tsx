@@ -13,8 +13,9 @@ import { StargateClient } from "@cosmjs/stargate";
 
 import { MdContentCopy, MdOutlineFileDownload } from "react-icons/md";
 import { toast, Toaster } from 'sonner';
-import { BiUpArrowAlt, BiScan, BiCopy, BiArrowBack } from 'react-icons/bi';
+import { BiUpArrowAlt, BiScan, BiArrowBack } from 'react-icons/bi';
 import DashboardTabs from './components/DashboardTabs';
+import DashboardHeader from './components/DashboardHeader';
 
 const RPC = 'https://evmos-rpc.publicnode.com';
 const DENOM = 'atucc';
@@ -23,7 +24,7 @@ const DISPLAY_DENOM = 'UCC';
 const LCD = 'http://145.223.80.193:26657';
 
 export default function App() {
-  const [step, setStep] = useState<'welcome' | 'new' | 'confirm' | 'import' | 'dashboard' | 'send' | 'receive'>('dashboard');
+  const [step, setStep] = useState<'welcome' | 'new' | 'confirm' | 'import' | 'dashboard' | 'send' | 'receive'>('welcome');
   const [mnemonic, setMnemonic] = useState('');
   const [confirmedMnemonic, setConfirmedMnemonic] = useState('');
   const [wallet, setWallet] = useState<any>(null);
@@ -267,10 +268,11 @@ export default function App() {
 
         {step === 'dashboard' && (
           <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[450px] rounded-md h-full overflow-y-auto bg-gray-100">
-            <div className="bg-white w-full shadow-md p-4 flex flex-col justify-center items-center gap-3">
-              <p className='font-extrabold text-lg'>Wallet</p>
-              <div className='text-center font-light text-gray-500 flex gap-4'><p className="my-auto">{truncateWalletAddress(address)}</p> <button onClick={copyAddress} className='my-auto cursor-pointer p-1'><BiCopy /></button></div>
-            </div>
+            <DashboardHeader
+              address={address}
+              truncateWalletAddress={truncateWalletAddress}
+              copyAddress={copyAddress}
+            />
             <div className="flex flex-col gap-5 h-full overflow-y-auto px-5 pb-5 bg-gray-100">
               <p className='text-4xl font-extrabold text-center mt-5'>{balance} {DISPLAY_DENOM}</p>
               <div className="w-full justify-center flex gap-10 mt-5">
@@ -305,10 +307,11 @@ export default function App() {
         )}
         {step === "send" && (
           <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[450px] rounded-md h-full overflow-y-auto bg-gray-100">
-            <div className="bg-white w-full shadow-md p-4 flex flex-col justify-center items-center gap-3">
-              <p className='font-extrabold text-lg'>Wallet</p>
-              <div className='text-center font-light text-gray-500 flex gap-4'><p className="my-auto">{truncateWalletAddress(address)}</p> <button className='my-auto'><BiCopy /></button></div>
-            </div>
+            <DashboardHeader
+              address={address}
+              truncateWalletAddress={truncateWalletAddress}
+              copyAddress={copyAddress}
+            />
             <div className="flex flex-col gap-5 h-full overflow-y-auto px-5 pb-5 bg-gray-100">
               <div className="flex justify-between">
                 <button
@@ -328,10 +331,11 @@ export default function App() {
         )}
         {step === "receive" && (
           <div className="flex flex-col gap-5 mx-auto shadow-md border-gray-500/30 border w-full md:w-[450px] rounded-md h-full overflow-y-auto bg-gray-100">
-            <div className="bg-white w-full shadow-md p-4 flex flex-col justify-center items-center gap-3">
-              <p className='font-extrabold text-lg'>Wallet</p>
-              <div className='text-center font-light text-gray-500 flex gap-4'><p className="my-auto">{truncateWalletAddress(address)}</p> <button className='my-auto'><BiCopy /></button></div>
-            </div>
+            <DashboardHeader
+              address={address}
+              truncateWalletAddress={truncateWalletAddress}
+              copyAddress={copyAddress}
+            />
             <div className="flex flex-col gap-5 h-full overflow-y-auto px-5 pb-5 bg-gray-100">
               <div className="flex justify-between">
                 <button

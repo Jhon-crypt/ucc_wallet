@@ -53,7 +53,7 @@ const DashboardTabs = ({ uccBalance }:{ uccBalance: string }) => {
           <div className="flex flex-coll gap-2 mt-5">
             {tokens.map((item, i) => (
               <div
-                className="flex justify-between gap-5 p-4 rounded-md hover:bg-gray-100 duration-200 w-full"
+                className="flex justify-between gap-5 p-4 rounded-md hover:bg-white ease-linear duration-200 w-full"
                 key={i}
               >
                 <div className="flex gap-5 my-auto">
