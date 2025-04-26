@@ -3,8 +3,13 @@
  */
 
 // Base URLs for the blockchain APIs
-export const REST_API_URL = 'http://145.223.80.193:1317';
-export const RPC_API_URL = 'http://145.223.80.193:26657';
+const BASE_API_URL = 'http://145.223.80.193:1317';
+const BASE_RPC_URL = 'http://145.223.80.193:26657';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+// Public URLs that include the CORS proxy
+export const REST_API_URL = `${CORS_PROXY}${encodeURIComponent(BASE_API_URL)}`;
+export const RPC_API_URL = `${CORS_PROXY}${encodeURIComponent(BASE_RPC_URL)}`;
 export const DENOM = 'atucc';
 export const DISPLAY_DENOM = 'UCC';
 
@@ -56,10 +61,15 @@ export async function getBalance(address: string): Promise<string> {
     console.log('Fetching balance for address:', address);
     
     // Try the new endpoint format first
-    const endpoint = `${REST_API_URL}/cosmos/bank/v1beta1/balances/${address}`;
-    console.log('Using endpoint:', endpoint);
+    const balanceUrl = `${BASE_API_URL}/cosmos/bank/v1beta1/balances/${address}`;
+    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(balanceUrl)}`;
+    console.log('Using proxy URL:', proxyUrl);
     
-    const response = await fetchApi(endpoint);
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
     console.log('Balance response:', data);
     
@@ -84,10 +94,15 @@ export async function getBalance(address: string): Promise<string> {
     // Try legacy endpoint format as fallback
     try {
       console.log('Trying legacy endpoint format');
-      const legacyEndpoint = `${REST_API_URL}/bank/balances/${address}`;
-      console.log('Using legacy endpoint:', legacyEndpoint);
+      const legacyUrl = `${BASE_API_URL}/bank/balances/${address}`;
+      const legacyProxyUrl = `${CORS_PROXY}${encodeURIComponent(legacyUrl)}`;
+      console.log('Using legacy proxy URL:', legacyProxyUrl);
       
-      const response = await fetchApi(legacyEndpoint);
+      const response = await fetch(legacyProxyUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       console.log('Legacy balance response:', data);
       
