@@ -29,6 +29,8 @@ interface EthereumRequest {
 interface EthereumProvider {
   request: (args: EthereumRequest) => Promise<unknown>;
   isMetaMask?: boolean;
+  on: (event: string, callback: (...args: any[]) => void) => void;
+  removeListener: (event: string, callback: (...args: any[]) => void) => void;
 }
 
 declare global {
