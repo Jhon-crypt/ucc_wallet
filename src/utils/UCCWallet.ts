@@ -1,16 +1,16 @@
 import { ethers } from 'ethers';
 import { bech32 } from 'bech32';
-import { RPC_API_URL, makeProxyRequest } from './apiUtils';
+import { axiosWithCors, REST_API_URL, RPC_API_URL } from './api';
+import { AxiosError } from 'axios';
 
 export interface Balance {
   denom: string;
-  amount: string;
+  amount: string | number;
 }
 
 export interface WalletInfo {
   ethAddress: string;
   cosmosAddress: string;
-  mnemonic?: string;
 }
 
 export interface TransactionResult {
@@ -21,59 +21,39 @@ export interface TransactionResult {
   error?: string;
 }
 
-interface EthereumRequest {
+interface BalanceResponse {
+  balances: Balance[];
+  result?: Balance[];
+}
+
+interface EthereumRequestParams {
   method: string;
   params?: unknown[];
 }
 
 interface EthereumProvider {
-  request: (args: EthereumRequest) => Promise<unknown>;
-  isMetaMask?: boolean;
-  on: (event: string, callback: (params: unknown) => void) => void;
-  removeListener: (event: string, callback: (params: unknown) => void) => void;
+  request: (args: EthereumRequestParams) => Promise<unknown>;
+  on: (event: string, handler: (params: string[]) => void) => void;
+  removeListener: (event: string, handler: (params: string[]) => void) => void;
 }
 
 declare global {
   interface Window {
-    ethereum?: EthereumProvider;
+    ethereum: EthereumProvider;
   }
 }
 
 export class UCCWallet {
   private rpcUrl: string;
+  private restUrl: string;
+  private chainId: string;
+  private provider: ethers.providers.JsonRpcProvider;
 
   constructor() {
-    // Remove the 'https://api.allorigins.win/raw?url=' prefix from RPC_API_URL
-    this.rpcUrl = decodeURIComponent(RPC_API_URL.replace('https://api.allorigins.win/raw?url=', ''));
-  }
-
-  // Generate new wallet
-  async generateWallet(): Promise<WalletInfo> {
-    const wallet = ethers.Wallet.createRandom();
-    return {
-      ethAddress: wallet.address,
-      cosmosAddress: this.ethToUcc(wallet.address),
-      mnemonic: wallet.mnemonic.phrase
-    };
-  }
-
-  // Import wallet from mnemonic
-  async importFromMnemonic(mnemonic: string): Promise<WalletInfo> {
-    const wallet = ethers.Wallet.fromMnemonic(mnemonic);
-    return {
-      ethAddress: wallet.address,
-      cosmosAddress: this.ethToUcc(wallet.address),
-      mnemonic
-    };
-  }
-
-  // Import wallet from private key
-  async importFromPrivateKey(privateKey: string): Promise<WalletInfo> {
-    const wallet = new ethers.Wallet(privateKey);
-    return {
-      ethAddress: wallet.address,
-      cosmosAddress: this.ethToUcc(wallet.address)
-    };
+    this.rpcUrl = RPC_API_URL;
+    this.restUrl = REST_API_URL;
+    this.chainId = 'universe_9000-1';
+    this.provider = new ethers.providers.JsonRpcProvider(this.rpcUrl);
   }
 
   // Connect to MetaMask and get wallet info
@@ -84,7 +64,9 @@ export class UCCWallet {
       }
 
       // Request account access
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      }) as string[];
       
       if (!accounts || accounts.length === 0) {
         throw new Error('No accounts found. Please unlock MetaMask.');
@@ -125,34 +107,56 @@ export class UCCWallet {
         ethAddress,
         cosmosAddress
       };
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Error connecting wallet:', error);
       throw error;
     }
+  }
+
+  // Get MetaMask signer
+  private async getSigner(): Promise<ethers.Signer> {
+    if (!window.ethereum) {
+      throw new Error('MetaMask not found. Please install MetaMask.');
+    }
+
+    // Request account access
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    
+    // Create Web3Provider and get signer
+    const metamaskProvider = new ethers.providers.Web3Provider(window.ethereum);
+    return metamaskProvider.getSigner();
+  }
+
+  // Convert ETH address to UCC
+  private ethToUcc(ethAddress: string): string {
+    const addressBuffer = Buffer.from(ethAddress.slice(2), 'hex');
+    const words = bech32.toWords(addressBuffer);
+    return bech32.encode('ucc', words);
   }
 
   // Get balance
   async getBalance(address: string): Promise<Balance[]> {
     try {
       console.log('Fetching balance for address:', address);
+      const endpoint = `${this.restUrl}/cosmos/bank/v1beta1/balances/${address}`;
+      console.log('Balance endpoint:', endpoint);
 
-      const response = await makeProxyRequest(`/cosmos/bank/v1beta1/balances/${address}`);
-      const data = await response.json();
-      console.log('Balance response:', data);
+      const response = await axiosWithCors.get<BalanceResponse>(endpoint);
+      console.log('Balance response:', response.data);
 
       // Extract balances from the response
-      let balances = data.balances || [];
+      let balances: Balance[] = response.data.balances || [];
       
       // If balances is empty, try the legacy format
-      if (!balances.length && data.result) {
+      if (balances.length === 0 && response.data.result) {
         console.log('Using legacy balance format');
-        balances = data.result;
+        balances = response.data.result;
       }
 
       console.log('Raw balances:', balances);
       
       // If still no balances, return zero balance
-      if (!balances.length) {
+      if (balances.length === 0) {
         console.log('No balances found, returning zero balance');
         return [{
           denom: 'atucc',
@@ -168,13 +172,21 @@ export class UCCWallet {
       console.log('ATUCC balance:', atuccBalance);
 
       // Convert amount to string if it's a number
-      if (typeof atuccBalance.amount === 'number') {
-        atuccBalance.amount = atuccBalance.amount.toString();
-      }
+      const amount = atuccBalance.amount;
+      atuccBalance.amount = (typeof amount === 'number') ? amount.toString() : amount;
 
       return [atuccBalance];
     } catch (error) {
       console.error('Error fetching balance:', error);
+      const axiosError = error as AxiosError;
+      if (axiosError.isAxiosError) {
+        console.error('Axios error details:', {
+          status: axiosError.response?.status,
+          statusText: axiosError.response?.statusText,
+          data: axiosError.response?.data,
+          url: axiosError.config?.url
+        });
+      }
       // Return zero balance instead of throwing
       return [{
         denom: 'atucc',
@@ -183,10 +195,51 @@ export class UCCWallet {
     }
   }
 
-  // Convert ETH address to UCC
-  private ethToUcc(ethAddress: string): string {
-    const addressBuffer = Buffer.from(ethAddress.slice(2), 'hex');
-    const words = bech32.toWords(addressBuffer);
-    return bech32.encode('ucc', words);
+  // Send UCC tokens using MetaMask
+  async sendTokens(
+    recipientAddress: string,
+    uccAmount: number
+  ): Promise<TransactionResult> {
+    try {
+      console.log('Initiating token transfer via MetaMask...');
+      
+      // Get signer from MetaMask
+      const signer = await this.getSigner();
+      
+      // Ensure recipient is in ETH format
+      const ethRecipient = recipientAddress;
+      if (!recipientAddress.startsWith('0x')) {
+        // TODO: Add conversion from UCC to ETH address if needed
+        throw new Error('Please provide an ETH address');
+      }
+
+      console.log('Sending to address:', ethRecipient);
+      console.log('Amount:', uccAmount);
+
+      // Send transaction
+      const tx = await signer.sendTransaction({
+        to: ethRecipient,
+        value: ethers.utils.parseEther(uccAmount.toString())
+      });
+
+      console.log('Transaction submitted:', tx.hash);
+      
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log('Transaction confirmed:', receipt);
+
+      return {
+        success: true,
+        txHash: tx.hash,
+        recipient: ethRecipient,
+        amount: uccAmount.toString()
+      };
+    } catch (error) {
+      console.error('Error sending tokens:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send tokens'
+      };
+    }
   }
 } 
