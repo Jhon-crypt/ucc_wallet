@@ -14,29 +14,29 @@ export const DENOM = 'atucc';
 export const DISPLAY_DENOM = 'UCC';
 
 /**
- * Utility function to make API requests with CORS proxy
- * 
- * @param url - The URL to fetch from
- * @param options - Optional fetch options
- * @returns Promise with fetch response
+ * Creates a CORS proxy URL for the given endpoint
+ * @param url - The full URL to proxy
+ * @returns The proxied URL
  */
-export async function fetchApi(url: string, options: RequestInit = {}) {
-  const corsProxyUrl = 'https://api.allorigins.win/raw?url=';
+function createProxyUrl(url: string): string {
+  return `${CORS_PROXY}${encodeURIComponent(url)}`;
+}
+
+/**
+ * Makes a request through the CORS proxy
+ * @param url - The full URL to proxy
+ * @param options - Fetch options
+ * @returns Promise with the response
+ */
+async function makeProxyRequest(url: string, options: RequestInit = {}): Promise<Response> {
+  const proxyUrl = createProxyUrl(url);
+  console.log('Making request through proxy:', proxyUrl);
   
-  try {
-    console.log('Making request to:', url);
-    const proxyUrl = `${corsProxyUrl}${encodeURIComponent(url)}`;
-    console.log('Using proxy URL:', proxyUrl);
-    
-    const response = await fetch(proxyUrl, options);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response;
-  } catch (error) {
-    console.error('Error fetching:', error);
-    throw error;
+  const response = await fetch(proxyUrl, options);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
+  return response;
 }
 
 /**
@@ -53,7 +53,7 @@ export async function getBalance(address: string): Promise<string> {
     const balanceUrl = `${BASE_API_URL}/cosmos/bank/v1beta1/balances/${address}`;
     console.log('Using endpoint:', balanceUrl);
     
-    const response = await fetchApi(balanceUrl);
+    const response = await makeProxyRequest(balanceUrl);
     const data = await response.json();
     console.log('Balance response:', data);
     
@@ -81,7 +81,7 @@ export async function getBalance(address: string): Promise<string> {
       const legacyUrl = `${BASE_API_URL}/bank/balances/${address}`;
       console.log('Using legacy endpoint:', legacyUrl);
       
-      const response = await fetchApi(legacyUrl);
+      const response = await makeProxyRequest(legacyUrl);
       const data = await response.json();
       console.log('Legacy balance response:', data);
       
