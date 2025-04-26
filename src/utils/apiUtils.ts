@@ -16,8 +16,8 @@ export const DISPLAY_DENOM = 'UCC';
  * @returns Promise with fetch response
  */
 export async function fetchApi(url: string, options: RequestInit = {}) {
-  // Using jsonp.afeld.me as CORS proxy - it's more reliable for HTTP endpoints
-  const corsProxyUrl = 'https://jsonp.afeld.me/?url=';
+  // Using allorigins.win CORS proxy with the correct URL format
+  const corsProxyUrl = 'https://api.allorigins.win/raw?url=';
   
   const defaultOptions: RequestInit = {
     ...options,
@@ -29,7 +29,9 @@ export async function fetchApi(url: string, options: RequestInit = {}) {
 
   try {
     console.log('Making request to:', url);
-    const proxyUrl = `${corsProxyUrl}${encodeURIComponent(url)}`;
+    // Properly encode the URL for the proxy
+    const encodedUrl = encodeURIComponent(url);
+    const proxyUrl = `${corsProxyUrl}${encodedUrl}`;
     console.log('Using proxy URL:', proxyUrl);
     
     const response = await fetch(proxyUrl, defaultOptions);
