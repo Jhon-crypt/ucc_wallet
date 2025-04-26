@@ -3,34 +3,36 @@
  */
 
 // Base URLs for the blockchain APIs
-export const REST_API_URL = 'https://145.223.80.193:1317';
-export const RPC_API_URL = 'https://145.223.80.193:26657';
+export const REST_API_URL = 'http://145.223.80.193:1317';
+export const RPC_API_URL = 'http://145.223.80.193:26657';
 export const DENOM = 'atucc';
 export const DISPLAY_DENOM = 'UCC';
 
 /**
- * Utility function to make API requests
+ * Utility function to make API requests with CORS proxy
  * 
  * @param url - The URL to fetch from
  * @param options - Optional fetch options
  * @returns Promise with fetch response
  */
 export async function fetchApi(url: string, options: RequestInit = {}) {
+  // Using jsonp.afeld.me as CORS proxy - it's more reliable for HTTP endpoints
+  const corsProxyUrl = 'https://jsonp.afeld.me/?url=';
+  
   const defaultOptions: RequestInit = {
-    mode: 'cors',
-    credentials: 'omit',
     ...options,
     headers: {
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
       ...options.headers,
     }
   };
 
   try {
     console.log('Making request to:', url);
-    console.log('With options:', defaultOptions);
-    const response = await fetch(url, defaultOptions);
+    const proxyUrl = `${corsProxyUrl}${encodeURIComponent(url)}`;
+    console.log('Using proxy URL:', proxyUrl);
+    
+    const response = await fetch(proxyUrl, defaultOptions);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
