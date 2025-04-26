@@ -16,8 +16,8 @@ export default function CreateWallet() {
     try {
       setIsLoading(true);
       const wallet = new UCCWallet();
-      const newWallet = wallet.generateWallet();
-      setMnemonic(newWallet.mnemonic);
+      const newWallet = await wallet.generateWallet();
+      setMnemonic(newWallet.mnemonic || '');
       toast.success('Wallet generated successfully!');
     } catch (error) {
       console.error('Error generating wallet:', error);

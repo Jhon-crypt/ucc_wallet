@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/Button';
-import { Card } from '../components/Card';
+import { ClickableCard } from '../components/Card';
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -41,7 +41,7 @@ export default function Welcome() {
           </motion.div>
 
           <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card onClick={() => navigate('/create-wallet')} className="text-left">
+            <ClickableCard onClick={() => navigate('/create-wallet')} className="text-left">
               <div className="space-y-4">
                 <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
                   <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -55,9 +55,9 @@ export default function Welcome() {
                   </p>
                 </div>
               </div>
-            </Card>
+            </ClickableCard>
 
-            <Card onClick={() => navigate('/import-wallet')} className="text-left">
+            <ClickableCard onClick={() => navigate('/import-wallet')} className="text-left">
               <div className="space-y-4">
                 <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
                   <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -71,7 +71,7 @@ export default function Welcome() {
                   </p>
                 </div>
               </div>
-            </Card>
+            </ClickableCard>
           </motion.div>
 
           <motion.div variants={item} className="pt-8">

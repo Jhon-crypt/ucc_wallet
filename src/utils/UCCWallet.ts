@@ -21,19 +21,27 @@ export interface TransactionResult {
   error?: string;
 }
 
+interface EthereumRequest {
+  method: string;
+  params?: unknown[];
+}
+
+interface EthereumProvider {
+  request: (args: EthereumRequest) => Promise<unknown>;
+  isMetaMask?: boolean;
+}
+
 declare global {
   interface Window {
-    ethereum?: any;
+    ethereum?: EthereumProvider;
   }
 }
 
 export class UCCWallet {
   private rpcUrl: string;
-  private provider: ethers.providers.JsonRpcProvider;
 
   constructor() {
     this.rpcUrl = 'http://145.223.80.193:8545';
-    this.provider = new ethers.providers.JsonRpcProvider(this.rpcUrl);
   }
 
   // Generate new wallet
@@ -73,7 +81,7 @@ export class UCCWallet {
       }
 
       // Request account access
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
       
       if (!accounts || accounts.length === 0) {
         throw new Error('No accounts found. Please unlock MetaMask.');
@@ -88,9 +96,9 @@ export class UCCWallet {
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: '0x2328' }], // Chain ID 9000
         });
-      } catch (switchError: any) {
+      } catch (switchError: unknown) {
         // This error code indicates that the chain has not been added to MetaMask
-        if (switchError.code === 4902) {
+        if (switchError && typeof switchError === 'object' && 'code' in switchError && switchError.code === 4902) {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
             params: [{
@@ -114,7 +122,7 @@ export class UCCWallet {
         ethAddress,
         cosmosAddress
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error connecting wallet:', error);
       throw error;
     }
