@@ -16,12 +16,21 @@ export const DISPLAY_DENOM = 'UCC';
  * @returns Promise with fetch response
  */
 export async function fetchWithCors(url: string, options: RequestInit = {}) {
-  // Try alternative CORS proxy format
-  // Using allorigins.win which has a more reliable URL format
-  const corsProxyUrl = 'https://api.allorigins.win/raw?url=';
+  // Using cors-anywhere as it handles headers better
+  const corsProxyUrl = 'https://cors-anywhere.herokuapp.com/';
   
+  const defaultOptions: RequestInit = {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Origin': 'https://ucc-wallet.vercel.app',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    }
+  };
+
   try {
-    const response = await fetch(`${corsProxyUrl}${encodeURIComponent(url)}`, options);
+    const response = await fetch(`${corsProxyUrl}${url}`, defaultOptions);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -40,12 +49,24 @@ export async function fetchWithCors(url: string, options: RequestInit = {}) {
  */
 export async function getBalance(address: string): Promise<string> {
   try {
+    console.log('Fetching balance for address:', address);
     const response = await fetchWithCors(`${REST_API_URL}/cosmos/bank/v1beta1/balances/${address}`);
     const data = await response.json();
-    const balanceObj = data.balances.find((b: { denom: string }) => b.denom === DENOM);
-    return balanceObj ? (+balanceObj.amount / 1e18).toFixed(2) : '0';
+    console.log('Balance response:', data);
+    
+    // Handle both new and legacy response formats
+    const balances = data.balances || data.result || [];
+    console.log('Parsed balances:', balances);
+    
+    const balanceObj = balances.find((b: { denom: string }) => b.denom === DENOM) || { denom: DENOM, amount: '0' };
+    console.log('Found balance object:', balanceObj);
+    
+    const formattedBalance = (+balanceObj.amount / 1e18).toFixed(2);
+    console.log('Formatted balance:', formattedBalance);
+    
+    return formattedBalance;
   } catch (error) {
     console.error('Failed to fetch balance:', error);
-    throw error;
+    return '0';
   }
 } 
