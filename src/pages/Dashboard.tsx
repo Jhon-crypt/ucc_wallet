@@ -427,7 +427,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Transactions Card */}
-            <Card className="lg:col-span-3">
+            {/* <Card className="lg:col-span-3">
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold">Recent Transactions</h2>
@@ -501,7 +501,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-            </Card>
+            </Card> */}
           </div>
         </motion.div>
       </div>
