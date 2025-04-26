@@ -1,5 +1,23 @@
 {
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-Requested-With, Content-Type, Accept" }
+      ]
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/cosmos/:path*",
+      "destination": "http://145.223.80.193:1317/:path*"
+    },
+    {
+      "source": "/api/rpc/:path*",
+      "destination": "http://145.223.80.193:26657/:path*"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
