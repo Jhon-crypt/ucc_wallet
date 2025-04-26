@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { bech32 } from 'bech32';
-import axios from 'axios';
+import { RPC_API_URL, makeProxyRequest } from './apiUtils';
 
 export interface Balance {
   denom: string;
@@ -29,8 +29,8 @@ interface EthereumRequest {
 interface EthereumProvider {
   request: (args: EthereumRequest) => Promise<unknown>;
   isMetaMask?: boolean;
-  on: (event: string, callback: (...args: any[]) => void) => void;
-  removeListener: (event: string, callback: (...args: any[]) => void) => void;
+  on: (event: string, callback: (params: unknown) => void) => void;
+  removeListener: (event: string, callback: (params: unknown) => void) => void;
 }
 
 declare global {
@@ -43,7 +43,8 @@ export class UCCWallet {
   private rpcUrl: string;
 
   constructor() {
-    this.rpcUrl = 'http://145.223.80.193:8545';
+    // Remove the 'https://api.allorigins.win/raw?url=' prefix from RPC_API_URL
+    this.rpcUrl = decodeURIComponent(RPC_API_URL.replace('https://api.allorigins.win/raw?url=', ''));
   }
 
   // Generate new wallet
@@ -134,19 +135,18 @@ export class UCCWallet {
   async getBalance(address: string): Promise<Balance[]> {
     try {
       console.log('Fetching balance for address:', address);
-      const endpoint = `http://145.223.80.193:1317/cosmos/bank/v1beta1/balances/${address}`;
-      console.log('Balance endpoint:', endpoint);
 
-      const response = await axios.get(endpoint);
-      console.log('Balance response:', response.data);
+      const response = await makeProxyRequest(`/cosmos/bank/v1beta1/balances/${address}`);
+      const data = await response.json();
+      console.log('Balance response:', data);
 
       // Extract balances from the response
-      let balances = response.data.balances || [];
+      let balances = data.balances || [];
       
       // If balances is empty, try the legacy format
-      if (!balances.length && response.data.result) {
+      if (!balances.length && data.result) {
         console.log('Using legacy balance format');
-        balances = response.data.result;
+        balances = data.result;
       }
 
       console.log('Raw balances:', balances);
@@ -175,14 +175,6 @@ export class UCCWallet {
       return [atuccBalance];
     } catch (error) {
       console.error('Error fetching balance:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('Axios error details:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          url: error.config?.url
-        });
-      }
       // Return zero balance instead of throwing
       return [{
         denom: 'atucc',

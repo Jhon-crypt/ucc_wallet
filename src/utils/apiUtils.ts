@@ -14,22 +14,14 @@ export const DENOM = 'atucc';
 export const DISPLAY_DENOM = 'UCC';
 
 /**
- * Creates a CORS proxy URL for the given endpoint
- * @param url - The full URL to proxy
- * @returns The proxied URL
- */
-function createProxyUrl(url: string): string {
-  return `${CORS_PROXY}${encodeURIComponent(url)}`;
-}
-
-/**
  * Makes a request through the CORS proxy
- * @param url - The full URL to proxy
+ * @param endpoint - The API endpoint path (will be appended to BASE_API_URL)
  * @param options - Fetch options
  * @returns Promise with the response
  */
-async function makeProxyRequest(url: string, options: RequestInit = {}): Promise<Response> {
-  const proxyUrl = createProxyUrl(url);
+export async function makeProxyRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const fullUrl = `${BASE_API_URL}${endpoint}`;
+  const proxyUrl = `${CORS_PROXY}${encodeURIComponent(fullUrl)}`;
   console.log('Making request through proxy:', proxyUrl);
   
   const response = await fetch(proxyUrl, options);
@@ -50,10 +42,7 @@ export async function getBalance(address: string): Promise<string> {
     console.log('Fetching balance for address:', address);
     
     // Try the new endpoint format first
-    const balanceUrl = `${BASE_API_URL}/cosmos/bank/v1beta1/balances/${address}`;
-    console.log('Using endpoint:', balanceUrl);
-    
-    const response = await makeProxyRequest(balanceUrl);
+    const response = await makeProxyRequest(`/cosmos/bank/v1beta1/balances/${address}`);
     const data = await response.json();
     console.log('Balance response:', data);
     
@@ -78,10 +67,7 @@ export async function getBalance(address: string): Promise<string> {
     // Try legacy endpoint format as fallback
     try {
       console.log('Trying legacy endpoint format');
-      const legacyUrl = `${BASE_API_URL}/bank/balances/${address}`;
-      console.log('Using legacy endpoint:', legacyUrl);
-      
-      const response = await makeProxyRequest(legacyUrl);
+      const response = await makeProxyRequest(`/bank/balances/${address}`);
       const data = await response.json();
       console.log('Legacy balance response:', data);
       
