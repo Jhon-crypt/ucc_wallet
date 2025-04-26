@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
@@ -99,70 +99,74 @@ export default function Home() {
         </motion.div>
 
         {/* Connection Guide Modal */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          onClick={() => setShowModal(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-900 rounded-xl p-6 max-w-lg w-full border border-purple-500/20"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">Connect Your Wallet</h2>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+        <AnimatePresence>
+          {showModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-gray-900 rounded-xl p-6 max-w-lg w-full border border-purple-500/20"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-white">Connect Your Wallet</h2>
+                    <button
+                      onClick={() => setShowModal(false)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
-                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded-full text-purple-400">1</div>
-                  <p>Make sure MetaMask is installed and unlocked</p>
-                </div>
-                
-                <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
-                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded-full text-purple-400">2</div>
-                  <p>Switch to Universe Chain network (will be added automatically)</p>
-                </div>
-                
-                <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
-                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded-full text-purple-400">3</div>
-                  <p>Approve the connection request in MetaMask</p>
-                </div>
-              </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
+                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded-full text-purple-400">1</div>
+                      <p>Make sure MetaMask is installed and unlocked</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
+                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded-full text-purple-400">2</div>
+                      <p>Switch to Universe Chain network (will be added automatically)</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
+                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded-full text-purple-400">3</div>
+                      <p>Approve the connection request in MetaMask</p>
+                    </div>
+                  </div>
 
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowModal(false);
-                    handleConnect();
-                  }}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-                >
-                  Connect Now
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowModal(false);
+                        handleConnect();
+                      }}
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                    >
+                      Connect Now
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <style>{`

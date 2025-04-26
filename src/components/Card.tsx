@@ -1,29 +1,26 @@
 import { ReactNode } from 'react';
+import { motion } from 'framer-motion';
+import { twMerge } from 'tailwind-merge';
 
 interface CardProps {
   children: ReactNode;
   className?: string;
+  onClick?: () => void;
 }
 
-export function Card({ children, className = '' }: CardProps) {
+export function Card({ children, className, onClick }: CardProps) {
   return (
-    <div className={`bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-interface ClickableCardProps extends CardProps {
-  onClick: () => void;
-}
-
-export function ClickableCard({ children, className = '', onClick }: ClickableCardProps) {
-  return (
-    <div 
+    <motion.div
+      whileHover={onClick ? { scale: 1.02 } : undefined}
+      whileTap={onClick ? { scale: 0.98 } : undefined}
       onClick={onClick}
-      className={`bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50 cursor-pointer hover:bg-gray-800/70 transition-colors ${className}`}
+      className={twMerge(
+        "bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 shadow-xl",
+        onClick && "cursor-pointer",
+        className
+      )}
     >
       {children}
-    </div>
+    </motion.div>
   );
 } 

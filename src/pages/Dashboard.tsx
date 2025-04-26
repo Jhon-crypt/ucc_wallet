@@ -7,6 +7,7 @@ import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { UCCWallet, WalletInfo } from '../utils/UCCWallet';
+import { SendTokenModal } from '../components/SendTokenModal';
 
 interface Balance {
   denom: string;
@@ -17,8 +18,47 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [balance, setBalance] = useState<string>('0');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [wallet, setWallet] = useState<UCCWallet | null>(null);
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+
+  // Function to fetch balance
+  const fetchBalance = async (address: string) => {
+    if (!wallet) return;
+
+    try {
+      setIsLoading(true);
+      console.log('Fetching balance for address:', address);
+      
+      const balances = await wallet.getBalance(address);
+      console.log('Raw balances:', balances);
+      
+      // Find ATUCC balance
+      const atuccBalance = balances.find((b: Balance) => b.denom === 'atucc')?.amount || '0';
+      console.log('ATUCC balance:', atuccBalance);
+      
+      // Convert from ATUCC (18 decimals) to UCC using BigNumber
+      const uccBalanceBN = ethers.BigNumber.from(atuccBalance);
+      const uccBalance = ethers.utils.formatUnits(uccBalanceBN, 18);
+      console.log('Converted UCC balance:', uccBalance);
+
+      // Format the balance with proper decimal places
+      const formattedBalance = Number(uccBalance).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 6
+      });
+      console.log('Formatted balance:', formattedBalance);
+
+      setBalance(uccBalance);
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      toast.error('Failed to fetch balance');
+      setBalance('0.00');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Initialize wallet and connect
   useEffect(() => {
@@ -96,38 +136,38 @@ export default function Dashboard() {
     window.location.reload();
   };
 
-  const fetchBalance = async (address: string) => {
-    if (!wallet) return;
+  const handleSendTokens = async (recipient: string, amount: string) => {
+    if (!wallet || !walletInfo) {
+      toast.error('Wallet not connected');
+      return;
+    }
 
     try {
-      setIsLoading(true);
-      console.log('Fetching balance for address:', address);
+      setIsSending(true);
+      const amountNum = parseFloat(amount);
       
-      const balances = await wallet.getBalance(address);
-      console.log('Raw balances:', balances);
-      
-      // Find ATUCC balance
-      const atuccBalance = balances.find((b: Balance) => b.denom === 'atucc')?.amount || '0';
-      console.log('ATUCC balance:', atuccBalance);
-      
-      // Convert from ATUCC (18 decimals) to UCC
-      const uccBalance = ethers.utils.formatUnits(atuccBalance, 18);
-      console.log('Converted UCC balance:', uccBalance);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        toast.error('Please enter a valid amount');
+        return;
+      }
 
-      // Format the balance with proper decimal places
-      const formattedBalance = parseFloat(uccBalance).toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 6
-      });
-      console.log('Formatted balance:', formattedBalance);
+      console.log('Sending transaction...');
+      const result = await wallet.sendTokens(recipient, amountNum);
 
-      setBalance(formattedBalance);
+      if (result.success) {
+        toast.success('Transaction sent successfully!');
+        console.log('Transaction hash:', result.txHash);
+        // Refresh balance after successful transaction
+        await fetchBalance(walletInfo.cosmosAddress);
+      } else {
+        console.error('Transaction failed:', result.error);
+        toast.error(result.error || 'Transaction failed');
+      }
     } catch (error) {
-      console.error('Error fetching balance:', error);
-      toast.error('Failed to fetch balance');
-      setBalance('0.00');
+      console.error('Error sending transaction:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send transaction');
     } finally {
-      setIsLoading(false);
+      setIsSending(false);
     }
   };
 
@@ -191,10 +231,21 @@ export default function Dashboard() {
 
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold font-mono">
-                      {balance}
-                    </span>
-                    <span className="text-xl text-gray-400">UCC</span>
+                    {isLoading ? (
+                      <div className="h-10 flex items-center">
+                        <div className="animate-pulse bg-gray-700 rounded h-8 w-32"></div>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-4xl font-bold font-mono">
+                          {Number(balance).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 6
+                          })}
+                        </span>
+                        <span className="text-xl text-gray-400">UCC</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <p className="text-gray-400">
@@ -205,46 +256,82 @@ export default function Dashboard() {
                     </p>
                     <span className="text-xs text-gray-500">(estimated)</span>
                   </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Last updated: {new Date().toLocaleTimeString()}
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setIsSendModalOpen(true)}
+                    isLoading={isSending}
+                    className="flex-1"
+                  >
+                    Send
+                  </Button>
+                  {/* <Button
+                    variant="secondary"
+                    onClick={() =>
+                    className="flex-1"
+                  >
+                    Receive
+                  </Button> */}
                 </div>
               </div>
             </Card>
 
-            {/* Network Info Card */}
+            {/* Network Card */}
             <Card>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Network</h2>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
                     <span>Universe Chain Mainnet</span>
                   </div>
-                  <div className="text-sm text-gray-400">
+                  <p className="text-sm text-gray-400">
                     Chain ID: universe_9000-1
-                  </div>
+                  </p>
                 </div>
               </div>
             </Card>
 
-            {/* Address Card */}
+            {/* Addresses Card */}
             <Card className="lg:col-span-3">
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Addresses</h2>
-                <div className="grid gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                      UCC Address
-                    </label>
-                    <code className="block bg-gray-800 rounded p-3 text-sm break-all">
-                      {walletInfo.cosmosAddress}
-                    </code>
+                <h2 className="text-xl font-semibold">Wallet Addresses</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-400">UCC Address</label>
+                    <div className="flex items-center gap-2 bg-gray-800/50 p-3 rounded-lg group cursor-pointer" onClick={() => {
+                      navigator.clipboard.writeText(walletInfo.cosmosAddress);
+                      toast.success('Address copied to clipboard!');
+                    }}>
+                      <code className="text-sm flex-1 break-all">
+                        {walletInfo.cosmosAddress}
+                      </code>
+                      <div className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                      ETH Address
-                    </label>
-                    <code className="block bg-gray-800 rounded p-3 text-sm break-all">
-                      {walletInfo.ethAddress}
-                    </code>
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-400">ETH Address</label>
+                    <div className="flex items-center gap-2 bg-gray-800/50 p-3 rounded-lg group cursor-pointer" onClick={() => {
+                      navigator.clipboard.writeText(walletInfo.ethAddress);
+                      toast.success('Address copied to clipboard!');
+                    }}>
+                      <code className="text-sm flex-1 break-all">
+                        {walletInfo.ethAddress}
+                      </code>
+                      <div className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -252,6 +339,14 @@ export default function Dashboard() {
           </div>
         </motion.div>
       </div>
+
+      {/* Send Token Modal */}
+      <SendTokenModal
+        isOpen={isSendModalOpen}
+        onClose={() => setIsSendModalOpen(false)}
+        onSend={handleSendTokens}
+        isLoading={isSending}
+      />
     </Layout>
   );
 } 
