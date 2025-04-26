@@ -6,13 +6,8 @@ import { ethers } from 'ethers';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { UCCWallet, WalletInfo } from '../utils/UCCWallet';
+import { UCCWallet, WalletInfo, Balance } from '../utils/UCCWallet';
 import { SendTokenModal } from '../components/SendTokenModal';
-
-interface Balance {
-  denom: string;
-  amount: string;
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();

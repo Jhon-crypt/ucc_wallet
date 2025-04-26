@@ -46,14 +46,10 @@ declare global {
 export class UCCWallet {
   private rpcUrl: string;
   private restUrl: string;
-  private chainId: string;
-  private provider: ethers.providers.JsonRpcProvider;
 
   constructor() {
     this.rpcUrl = RPC_API_URL;
     this.restUrl = REST_API_URL;
-    this.chainId = 'universe_9000-1';
-    this.provider = new ethers.providers.JsonRpcProvider(this.rpcUrl);
   }
 
   // Connect to MetaMask and get wallet info
@@ -241,5 +237,29 @@ export class UCCWallet {
         error: error instanceof Error ? error.message : 'Failed to send tokens'
       };
     }
+  }
+
+  // Generate new wallet
+  async generateWallet(): Promise<{ mnemonic: string; address: string }> {
+    const wallet = ethers.Wallet.createRandom();
+    const address = this.ethToUcc(wallet.address);
+    return {
+      mnemonic: wallet.mnemonic.phrase,
+      address
+    };
+  }
+
+  // Import wallet from mnemonic
+  async importFromMnemonic(mnemonic: string): Promise<{ address: string }> {
+    const wallet = ethers.Wallet.fromMnemonic(mnemonic);
+    const address = this.ethToUcc(wallet.address);
+    return { address };
+  }
+
+  // Import wallet from private key
+  async importFromPrivateKey(privateKey: string): Promise<{ address: string }> {
+    const wallet = new ethers.Wallet(privateKey);
+    const address = this.ethToUcc(wallet.address);
+    return { address };
   }
 } 
