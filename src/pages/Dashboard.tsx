@@ -26,30 +26,57 @@ export default function Dashboard() {
 
     try {
       setIsLoading(true);
-      console.log(`Fetching balance attempt ${pollCount + 1} for address:`, address);
+      console.log('Fetching balance for address:', address);
       
       const balances = await wallet.getBalance(address);
-      console.log('Raw balances:', balances);
+      console.log('Raw balances response:', JSON.stringify(balances, null, 2));
       
-      // Find ATUCC balance
-      const atuccBalance = balances.find((b: Balance) => b.denom === 'atucc')?.amount || '0';
-      console.log('ATUCC balance:', atuccBalance);
+      // Find ATUCC balance with detailed logging
+      const atuccBalance = balances.find((b: Balance) => {
+        console.log('Checking balance denom:', b.denom);
+        return b.denom === 'atucc';
+      })?.amount || '0';
       
-      // Convert from ATUCC (18 decimals) to UCC
-      const uccBalance = ethers.utils.formatUnits(atuccBalance, 18);
-      console.log('Converted UCC balance:', uccBalance);
+      console.log('Found ATUCC balance:', atuccBalance);
+      
+      // Ensure the balance is a valid string before conversion
+      if (typeof atuccBalance !== 'string') {
+        console.error('Invalid balance format:', atuccBalance);
+        return false;
+      }
+
+      // Convert from ATUCC (18 decimals) to UCC with validation
+      let uccBalance;
+      try {
+        uccBalance = ethers.utils.formatUnits(atuccBalance, 18);
+        console.log('Converted UCC balance:', uccBalance);
+      } catch (error) {
+        console.error('Error converting balance:', error);
+        return false;
+      }
+
+      // Validate the converted balance
+      const numericBalance = parseFloat(uccBalance);
+      if (isNaN(numericBalance)) {
+        console.error('Invalid numeric balance after conversion');
+        return false;
+      }
 
       // Format the balance with proper decimal places
-      const formattedBalance = parseFloat(uccBalance).toLocaleString('en-US', {
+      const formattedBalance = numericBalance.toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 6
       });
-      console.log('Formatted balance:', formattedBalance);
+      console.log('Final formatted balance:', formattedBalance);
 
       setBalance(uccBalance);
       return true;
     } catch (error) {
       console.error('Error fetching balance:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       return false;
     } finally {
       setIsLoading(false);
