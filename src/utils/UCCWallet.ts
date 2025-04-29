@@ -5,7 +5,7 @@ import { AxiosError } from 'axios';
 
 export interface Balance {
   denom: string;
-  amount: string | number;
+  amount: string;
 }
 
 export interface WalletInfo {
@@ -16,8 +16,6 @@ export interface WalletInfo {
 export interface TransactionResult {
   success: boolean;
   txHash?: string;
-  recipient?: string;
-  amount?: string;
   error?: string;
 }
 
@@ -44,12 +42,18 @@ declare global {
 }
 
 export class UCCWallet {
-  private rpcUrl: string;
-  private restUrl: string;
+  private chainId = 'universe_9000-1';
+  private chainName = 'Universe Chain Mainnet';
+  private rpcUrl = 'http://145.223.80.193:8545';
+  private restUrl = 'http://145.223.80.193:1317';
+  private provider: ethers.providers.Web3Provider | null = null;
 
   constructor() {
     this.rpcUrl = RPC_API_URL;
     this.restUrl = REST_API_URL;
+    if (window.ethereum) {
+      this.provider = new ethers.providers.Web3Provider(window.ethereum);
+    }
   }
 
   // Connect to MetaMask and get wallet info
@@ -133,61 +137,18 @@ export class UCCWallet {
   // Get balance
   async getBalance(address: string): Promise<Balance[]> {
     try {
-      console.log('Fetching balance for address:', address);
-      const endpoint = `${this.restUrl}/cosmos/bank/v1beta1/balances/${address}`;
-      console.log('Balance endpoint:', endpoint);
-
-      const response = await axiosWithCors.get<BalanceResponse>(endpoint);
-      console.log('Balance response:', response.data);
-
-      // Extract balances from the response
-      let balances: Balance[] = response.data.balances || [];
+      // Use Web3Provider to get balance directly like MetaMask does
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const balance = await provider.getBalance(address);
       
-      // If balances is empty, try the legacy format
-      if (balances.length === 0 && response.data.result) {
-        console.log('Using legacy balance format');
-        balances = response.data.result;
-      }
-
-      console.log('Raw balances:', balances);
-      
-      // If still no balances, return zero balance
-      if (balances.length === 0) {
-        console.log('No balances found, returning zero balance');
-        return [{
-          denom: 'atucc',
-          amount: '0'
-        }];
-      }
-
-      // Filter for atucc balance
-      const atuccBalance = balances.find((b: Balance) => b.denom === 'atucc') || {
-        denom: 'atucc',
-        amount: '0'
-      };
-      console.log('ATUCC balance:', atuccBalance);
-
-      // Convert amount to string if it's a number
-      const amount = atuccBalance.amount;
-      atuccBalance.amount = (typeof amount === 'number') ? amount.toString() : amount;
-
-      return [atuccBalance];
-    } catch (error) {
-      console.error('Error fetching balance:', error);
-      const axiosError = error as AxiosError;
-      if (axiosError.isAxiosError) {
-        console.error('Axios error details:', {
-          status: axiosError.response?.status,
-          statusText: axiosError.response?.statusText,
-          data: axiosError.response?.data,
-          url: axiosError.config?.url
-        });
-      }
-      // Return zero balance instead of throwing
+      // Convert the balance to our format
       return [{
         denom: 'atucc',
-        amount: '0'
+        amount: balance.toString()
       }];
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      throw error;
     }
   }
 
@@ -227,8 +188,7 @@ export class UCCWallet {
       return {
         success: true,
         txHash: tx.hash,
-        recipient: ethRecipient,
-        amount: uccAmount.toString()
+        error: undefined
       };
     } catch (error) {
       console.error('Error sending tokens:', error);
