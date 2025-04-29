@@ -11,7 +11,7 @@ import { SendTokenModal } from '../components/SendTokenModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [balance, setBalance] = useState<string>('0');
+  const [balance, setBalance] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [wallet, setWallet] = useState<UCCWallet | null>(null);
@@ -277,7 +277,7 @@ export default function Dashboard() {
 
                 <div>
                   <div className="flex items-baseline gap-2">
-                    {isLoading ? (
+                    {isLoading || balance === null ? (
                       <div className="h-10 flex items-center">
                         <div className="animate-pulse bg-gray-700 rounded h-8 w-32"></div>
                       </div>
@@ -294,16 +294,22 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <p className="text-gray-400">
-                      ≈ ${(Number(balance) * 1.5).toLocaleString('en-US', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      })} USD
-                    </p>
-                    <span className="text-xs text-gray-500">(estimated)</span>
+                    {isLoading || balance === null ? (
+                      <div className="animate-pulse bg-gray-700 rounded h-4 w-24"></div>
+                    ) : (
+                      <>
+                        <p className="text-gray-400">
+                          ≈ ${(Number(balance) * 1.5).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })} USD
+                        </p>
+                        <span className="text-xs text-gray-500">(estimated)</span>
+                      </>
+                    )}
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    Last updated: {new Date().toLocaleTimeString()}
+                    {isLoading ? 'Fetching balance...' : `Last updated: ${new Date().toLocaleTimeString()}`}
                   </p>
                 </div>
 
