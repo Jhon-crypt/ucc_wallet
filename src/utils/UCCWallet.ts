@@ -18,11 +18,6 @@ export interface TransactionResult {
   error?: string;
 }
 
-interface BalanceResponse {
-  balances: Balance[];
-  result?: Balance[];
-}
-
 interface EthereumRequestParams {
   method: string;
   params?: unknown[];
@@ -181,14 +176,21 @@ export class UCCWallet {
       // Get signer from MetaMask
       const signer = await this.getSigner();
       
-      // Ensure recipient is in ETH format
-      const ethRecipient = recipientAddress;
-      if (!recipientAddress.startsWith('0x')) {
-        // TODO: Add conversion from UCC to ETH address if needed
-        throw new Error('Please provide an ETH address');
+      // Convert UCC address to ETH address if needed
+      let ethRecipient = recipientAddress;
+      if (recipientAddress.startsWith('ucc')) {
+        try {
+          ethRecipient = this.uccToEth(recipientAddress);
+          console.log('Converted UCC address to ETH address:', ethRecipient);
+        } catch (error) {
+          console.error('Error converting UCC address:', error);
+          throw new Error('Invalid UCC address format');
+        }
+      } else if (!recipientAddress.startsWith('0x')) {
+        throw new Error('Invalid address format. Please provide a UCC or ETH address');
       }
 
-      console.log('Sending to address:', ethRecipient);
+      console.log('Sending to ETH address:', ethRecipient);
       console.log('Amount:', uccAmount);
 
       // Send transaction
