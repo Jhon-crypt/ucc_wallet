@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import { bech32 } from 'bech32';
-import { axiosWithCors, REST_API_URL, RPC_API_URL } from './api';
-import { AxiosError } from 'axios';
+import { RPC_API_URL } from './api';
 
 export interface Balance {
   denom: string;
@@ -44,13 +43,13 @@ declare global {
 export class UCCWallet {
   private chainId = 'universe_9000-1';
   private chainName = 'Universe Chain Mainnet';
-  private rpcUrl = 'http://145.223.80.193:8545';
-  private restUrl = 'http://145.223.80.193:1317';
+  private rpcUrl = RPC_API_URL;
+  private restUrl = RPC_API_URL;
   private provider: ethers.providers.Web3Provider | null = null;
 
   constructor() {
     this.rpcUrl = RPC_API_URL;
-    this.restUrl = REST_API_URL;
+    this.restUrl = RPC_API_URL;
     if (window.ethereum) {
       this.provider = new ethers.providers.Web3Provider(window.ethereum);
     }
@@ -134,12 +133,31 @@ export class UCCWallet {
     return bech32.encode('ucc', words);
   }
 
-  // Get balance
-  async getBalance(address: string): Promise<Balance[]> {
+  // Convert UCC address to ETH
+  private uccToEth(uccAddress: string): string {
     try {
-      // Use Web3Provider to get balance directly like MetaMask does
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const balance = await provider.getBalance(address);
+      const decoded = bech32.decode(uccAddress);
+      const buffer = Buffer.from(bech32.fromWords(decoded.words));
+      return '0x' + buffer.toString('hex');
+    } catch (error) {
+      console.error('Error converting UCC to ETH address:', error);
+      throw error;
+    }
+  }
+
+  // Get balance
+  async getBalance(uccAddress: string): Promise<Balance[]> {
+    try {
+      if (!this.provider) {
+        throw new Error('Provider not initialized');
+      }
+
+      // Convert UCC address to ETH address for balance check
+      const ethAddress = this.uccToEth(uccAddress);
+      console.log('Fetching balance for ETH address:', ethAddress);
+      
+      const balance = await this.provider.getBalance(ethAddress);
+      console.log('Raw balance:', balance.toString());
       
       // Convert the balance to our format
       return [{
