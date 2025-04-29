@@ -164,10 +164,18 @@ export default function Dashboard() {
         // Fetch initial balance
         await fetchBalanceWithRetries(info.cosmosAddress);
 
-        // Listen for account changes
+        // Listen for account changes and transactions
         if (window.ethereum) {
           window.ethereum.on('accountsChanged', handleAccountsChanged);
           window.ethereum.on('chainChanged', handleChainChanged);
+          // Listen for new blocks which might contain our transactions
+          const provider = new ethers.providers.Web3Provider(window.ethereum);
+          provider.on('block', async () => {
+            console.log('New block detected, updating balance...');
+            if (info.cosmosAddress) {
+              await fetchBalanceWithRetries(info.cosmosAddress);
+            }
+          });
         }
       } catch (error) {
         console.error('Error initializing wallet:', error);
@@ -183,17 +191,19 @@ export default function Dashboard() {
       if (window.ethereum) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
         window.ethereum.removeListener('chainChanged', handleChainChanged);
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        provider.removeAllListeners('block');
       }
     };
   }, [navigate]);
 
-  // Regular balance polling
+  // Regular balance polling with shorter interval
   useEffect(() => {
     if (!walletInfo?.cosmosAddress || isPolling) return;
 
     const pollInterval = setInterval(() => {
       fetchBalanceWithRetries(walletInfo.cosmosAddress);
-    }, 10000); // Poll every 10 seconds
+    }, 3000); // Poll every 3 seconds instead of 10
 
     return () => clearInterval(pollInterval);
   }, [walletInfo?.cosmosAddress, isPolling]);
