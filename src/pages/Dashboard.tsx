@@ -17,14 +17,16 @@ export default function Dashboard() {
   const [wallet, setWallet] = useState<UCCWallet | null>(null);
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
 
-  // Function to fetch balance
-  const fetchBalance = async (address: string) => {
+  // Function to fetch balance with retries
+  const fetchBalanceWithRetries = async (address: string) => {
     if (!wallet) return;
 
     try {
       setIsLoading(true);
-      console.log('Fetching balance for address:', address);
+      console.log(`Fetching balance attempt ${pollCount + 1} for address:`, address);
       
       const balances = await wallet.getBalance(address);
       console.log('Raw balances:', balances);
@@ -33,29 +35,93 @@ export default function Dashboard() {
       const atuccBalance = balances.find((b: Balance) => b.denom === 'atucc')?.amount || '0';
       console.log('ATUCC balance:', atuccBalance);
       
-      // Convert from ATUCC (18 decimals) to UCC using BigNumber
-      const uccBalanceBN = ethers.BigNumber.from(atuccBalance);
-      const uccBalance = ethers.utils.formatUnits(uccBalanceBN, 18);
+      // Convert from ATUCC (18 decimals) to UCC
+      const uccBalance = ethers.utils.formatUnits(atuccBalance, 18);
       console.log('Converted UCC balance:', uccBalance);
 
       // Format the balance with proper decimal places
-      const formattedBalance = Number(uccBalance).toLocaleString('en-US', {
+      const formattedBalance = parseFloat(uccBalance).toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 6
       });
       console.log('Formatted balance:', formattedBalance);
 
       setBalance(uccBalance);
+      return true;
     } catch (error) {
       console.error('Error fetching balance:', error);
-      toast.error('Failed to fetch balance');
-      setBalance('0.00');
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Initialize wallet and connect
+  // Start polling after transaction
+  const startPolling = async (address: string) => {
+    setIsPolling(true);
+    setPollCount(0);
+    
+    const pollInterval = 2000; // 2 seconds
+    const maxAttempts = 5;
+
+    const poll = async () => {
+      if (pollCount >= maxAttempts) {
+        setIsPolling(false);
+        return;
+      }
+
+      const success = await fetchBalanceWithRetries(address);
+      if (!success) {
+        setPollCount(count => count + 1);
+        setTimeout(() => poll(), pollInterval);
+      } else {
+        setIsPolling(false);
+      }
+    };
+
+    await poll();
+  };
+
+  // Handle sending tokens
+  const handleSendTokens = async (recipient: string, amount: string) => {
+    if (!wallet || !walletInfo) {
+      toast.error('Wallet not connected');
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      const amountNum = parseFloat(amount);
+      
+      if (isNaN(amountNum) || amountNum <= 0) {
+        toast.error('Please enter a valid amount');
+        return;
+      }
+
+      console.log('Sending transaction...');
+      const result = await wallet.sendTokens(recipient, amountNum);
+
+      if (result.success) {
+        toast.success('Transaction sent successfully!');
+        console.log('Transaction hash:', result.txHash);
+        
+        // Start polling for balance updates
+        await startPolling(walletInfo.cosmosAddress);
+        
+        setIsSendModalOpen(false);
+      } else {
+        console.error('Transaction failed:', result.error);
+        toast.error(result.error || 'Transaction failed');
+      }
+    } catch (error) {
+      console.error('Error sending transaction:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send transaction');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Initialize wallet and set up polling
   useEffect(() => {
     const initWallet = async () => {
       try {
@@ -69,8 +135,7 @@ export default function Dashboard() {
         setWalletInfo(info);
 
         // Fetch initial balance
-        console.log('Fetching initial balance for:', info.cosmosAddress);
-        await fetchBalance(info.cosmosAddress);
+        await fetchBalanceWithRetries(info.cosmosAddress);
 
         // Listen for account changes
         if (window.ethereum) {
@@ -95,22 +160,16 @@ export default function Dashboard() {
     };
   }, [navigate]);
 
-  // Set up periodic balance refresh
+  // Regular balance polling
   useEffect(() => {
-    if (!walletInfo?.cosmosAddress) return;
+    if (!walletInfo?.cosmosAddress || isPolling) return;
 
-    console.log('Setting up balance refresh interval');
-    // Fetch balance immediately
-    fetchBalance(walletInfo.cosmosAddress);
+    const pollInterval = setInterval(() => {
+      fetchBalanceWithRetries(walletInfo.cosmosAddress);
+    }, 10000); // Poll every 10 seconds
 
-    // Then fetch every 30 seconds
-    const interval = setInterval(() => {
-      console.log('Refreshing balance...');
-      fetchBalance(walletInfo.cosmosAddress);
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [walletInfo?.cosmosAddress]);
+    return () => clearInterval(pollInterval);
+  }, [walletInfo?.cosmosAddress, isPolling]);
 
   const handleAccountsChanged = async (accounts: string[]) => {
     if (accounts.length === 0) {
@@ -121,7 +180,7 @@ export default function Dashboard() {
       if (wallet) {
         const info = await wallet.connectWallet();
         setWalletInfo(info);
-        await fetchBalance(info.cosmosAddress);
+        await fetchBalanceWithRetries(info.cosmosAddress);
       }
     }
   };
@@ -129,41 +188,6 @@ export default function Dashboard() {
   const handleChainChanged = () => {
     // Reload the page when the chain changes
     window.location.reload();
-  };
-
-  const handleSendTokens = async (recipient: string, amount: string) => {
-    if (!wallet || !walletInfo) {
-      toast.error('Wallet not connected');
-      return;
-    }
-
-    try {
-      setIsSending(true);
-      const amountNum = parseFloat(amount);
-      
-      if (isNaN(amountNum) || amountNum <= 0) {
-        toast.error('Please enter a valid amount');
-        return;
-      }
-
-      console.log('Sending transaction...');
-      const result = await wallet.sendTokens(recipient, amountNum);
-
-      if (result.success) {
-        toast.success('Transaction sent successfully!');
-        console.log('Transaction hash:', result.txHash);
-        // Refresh balance after successful transaction
-        await fetchBalance(walletInfo.cosmosAddress);
-      } else {
-        console.error('Transaction failed:', result.error);
-        toast.error(result.error || 'Transaction failed');
-      }
-    } catch (error) {
-      console.error('Error sending transaction:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send transaction');
-    } finally {
-      setIsSending(false);
-    }
   };
 
   const handleDisconnect = () => {
@@ -216,7 +240,7 @@ export default function Dashboard() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => fetchBalance(walletInfo.cosmosAddress)}
+                      onClick={() => fetchBalanceWithRetries(walletInfo.cosmosAddress)}
                       isLoading={isLoading}
                     >
                       Refresh
