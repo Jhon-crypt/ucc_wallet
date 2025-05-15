@@ -436,18 +436,6 @@ export default function Dashboard() {
 
           {/* Token List */}
           <div className="mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Tokens</h2>
-              <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <PlusIcon className="h-5 w-5" />
-                Import Token
-              </button>
-            </div>
-
-            {/* Token List */}
             <TokenList 
               tokens={tokens} 
               onImportClick={() => setIsImportModalOpen(true)} 
