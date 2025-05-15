@@ -14,24 +14,11 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
   const [tokenAddress, setTokenAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
+  const [searchedAddress, setSearchedAddress] = useState('');
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTokenAddress(e.target.value.trim());
     setTokenInfo(null); // Reset token info when address changes
-  };
-
-  const validateAndFormatAddress = (address: string): string => {
-    // If it's already a valid ETH address, return it
-    if (ethers.utils.isAddress(address)) {
-      return address;
-    }
-
-    // If it's a valid ETH address without '0x' prefix, add it
-    if (ethers.utils.isAddress('0x' + address)) {
-      return '0x' + address;
-    }
-
-    throw new Error('Invalid token contract address format');
   };
 
   const handleSearch = async () => {
@@ -39,15 +26,15 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     
     setIsLoading(true);
     try {
-      // Try to validate and format the address
-      const formattedAddress = validateAndFormatAddress(tokenAddress);
-      
-      // Search for token info
-      const info = await onImport(formattedAddress);
+      console.log('Searching for token:', tokenAddress);
+      const info = await onImport(tokenAddress);
+      console.log('Token found:', info);
       setTokenInfo(info);
+      setSearchedAddress(tokenAddress);
       toast.success('Token found! Click Import to add it to your wallet.');
     } catch (err) {
       const error = err as Error;
+      console.error('Token search error:', error);
       toast.error(error.message || 'Invalid token address or contract');
       setTokenInfo(null);
     } finally {
@@ -56,17 +43,29 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
   };
 
   const handleImport = async () => {
-    if (!tokenInfo) return;
+    if (!tokenInfo || !searchedAddress) return;
 
+    setIsLoading(true);
     try {
-      await onImport(tokenAddress);
+      console.log('Importing token:', searchedAddress);
+      await onImport(searchedAddress);
       toast.success(`${tokenInfo.symbol} token imported successfully!`);
       setTokenAddress('');
       setTokenInfo(null);
+      setSearchedAddress('');
       onClose();
     } catch (err) {
       const error = err as Error;
+      console.error('Token import error:', error);
       toast.error(error.message || 'Failed to import token');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !isLoading) {
+      handleSearch();
     }
   };
 
@@ -91,6 +90,7 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
                   type="text"
                   value={tokenAddress}
                   onChange={handleAddressChange}
+                  onKeyPress={handleKeyPress}
                   placeholder="Enter token contract address"
                   className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
@@ -149,7 +149,7 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
                 disabled={!tokenInfo || isLoading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Import Token
+                {isLoading ? 'Importing...' : 'Import Token'}
               </button>
             </div>
           </div>

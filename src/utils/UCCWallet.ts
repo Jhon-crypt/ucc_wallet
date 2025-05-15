@@ -59,16 +59,16 @@ export class UCCWallet {
   private chainId = 'universe_9000-1';
   private chainName = 'Universe Chain Mainnet';
   private rpcUrl = RPC_API_URL;
-  private restUrl = RPC_API_URL;
   private provider: ethers.providers.Web3Provider | null = null;
+  private rpcProvider: ethers.providers.JsonRpcProvider;
   private tokens: Map<string, TokenInfo> = new Map();
 
   constructor() {
-    this.rpcUrl = RPC_API_URL;
-    this.restUrl = RPC_API_URL;
     if (window.ethereum) {
       this.provider = new ethers.providers.Web3Provider(window.ethereum);
     }
+    // Initialize RPC provider for token contract interactions
+    this.rpcProvider = new ethers.providers.JsonRpcProvider(RPC_API_URL);
     this.loadSavedTokens();
   }
 
@@ -99,34 +99,29 @@ export class UCCWallet {
 
   // Validate token contract
   private async validateTokenContract(tokenAddress: string): Promise<ethers.Contract> {
-    if (!this.provider) {
-      throw new Error('Provider not initialized');
-    }
-
-    if (!ethers.utils.isAddress(tokenAddress)) {
-      throw new Error('Invalid token address format');
-    }
-
     try {
-      const code = await this.provider.getCode(tokenAddress);
+      // Use RPC provider instead of MetaMask provider for token validation
+      const code = await this.rpcProvider.getCode(tokenAddress);
       if (code === '0x') {
         throw new Error('No contract found at this address');
       }
 
-      const contract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
+      const contract = new ethers.Contract(tokenAddress, ERC20_ABI, this.rpcProvider);
       
       // Try to call basic ERC20 functions to validate the contract
       try {
-        await Promise.all([
-          contract.name(),
-          contract.symbol(),
-          contract.decimals()
+        const [name, symbol, decimals] = await Promise.all([
+          contract.name().catch(() => 'Unknown Token'),
+          contract.symbol().catch(() => 'UNKNOWN'),
+          contract.decimals().catch(() => 18)
         ]);
-      } catch (error) {
+
+        console.log('Token contract validated:', { name, symbol, decimals });
+        return contract;
+      } catch (err) {
+        console.error('Error validating token functions:', err);
         throw new Error('Invalid ERC20 token contract. The contract does not implement the required functions.');
       }
-
-      return contract;
     } catch (error) {
       console.error('Token validation error:', error);
       if (error instanceof Error) {
@@ -139,13 +134,26 @@ export class UCCWallet {
   // Add a new token
   async addToken(tokenAddress: string): Promise<TokenInfo> {
     try {
-      const normalizedAddress = ethers.utils.getAddress(tokenAddress); // This ensures checksum address
+      // Clean and validate the address
+      let normalizedAddress = tokenAddress.trim();
+      if (!normalizedAddress.startsWith('0x')) {
+        normalizedAddress = '0x' + normalizedAddress;
+      }
+      
+      // Validate address format
+      try {
+        normalizedAddress = ethers.utils.getAddress(normalizedAddress);
+      } catch (error) {
+        throw new Error('Invalid token address format');
+      }
       
       // Check if token is already added
       if (this.tokens.has(normalizedAddress.toLowerCase())) {
         throw new Error('Token is already imported');
       }
 
+      console.log('Validating token contract at address:', normalizedAddress);
+      
       // Validate the token contract
       const contract = await this.validateTokenContract(normalizedAddress);
       
@@ -155,6 +163,8 @@ export class UCCWallet {
         contract.symbol().catch(() => 'UNKNOWN'),
         contract.decimals().catch(() => 18)
       ]);
+
+      console.log('Token info retrieved:', { name, symbol, decimals });
 
       const tokenInfo: TokenInfo = {
         address: normalizedAddress,
@@ -170,6 +180,7 @@ export class UCCWallet {
           const address = await signer.getAddress();
           const balance = await contract.balanceOf(address);
           tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
+          console.log('Initial token balance:', tokenInfo.balance);
         } catch (error) {
           console.error('Error fetching initial balance:', error);
           tokenInfo.balance = '0';
