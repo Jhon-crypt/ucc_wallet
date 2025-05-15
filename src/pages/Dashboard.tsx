@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
+import { toast } from 'react-hot-toast';
 import { ethers } from 'ethers';
+import { UCCWallet, WalletInfo, Balance, TokenInfo } from '../utils/UCCWallet';
+import { SendTokenModal } from '../components/SendTokenModal';
+import ImportToken from '../components/ImportToken';
+import { PlusIcon } from '@heroicons/react/24/outline';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { UCCWallet, WalletInfo, Balance } from '../utils/UCCWallet';
-import { SendTokenModal } from '../components/SendTokenModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -19,6 +21,8 @@ export default function Dashboard() {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [pollCount, setPollCount] = useState(0);
+  const [showImportToken, setShowImportToken] = useState(false);
+  const [tokens, setTokens] = useState<TokenInfo[]>([]);
 
   // Function to fetch balance with retries
   const fetchBalanceWithRetries = async (address: string) => {
@@ -231,6 +235,37 @@ export default function Dashboard() {
     navigate('/');
   };
 
+  // Load tokens on mount
+  useEffect(() => {
+    if (wallet) {
+      setTokens(wallet.getTokens());
+    }
+  }, [wallet]);
+
+  // Handle token import
+  const handleImportToken = async (tokenAddress: string): Promise<TokenInfo> => {
+    if (!wallet) {
+      throw new Error('Wallet not initialized');
+    }
+    const tokenInfo = await wallet.addToken(tokenAddress);
+    setTokens(wallet.getTokens());
+    return tokenInfo;
+  };
+
+  // Update token balances
+  const updateTokenBalances = async () => {
+    if (!wallet || !walletInfo) return;
+    await wallet.updateAllTokenBalances(walletInfo.ethAddress);
+    setTokens(wallet.getTokens());
+  };
+
+  // Update balances when wallet is connected
+  useEffect(() => {
+    if (wallet && walletInfo) {
+      updateTokenBalances();
+    }
+  }, [wallet, walletInfo]);
+
   if (!walletInfo) {
     return (
       <Layout>
@@ -399,6 +434,51 @@ export default function Dashboard() {
               </div>
             </Card>
           </div>
+
+          {/* Token List */}
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Tokens</h2>
+              <button
+                onClick={() => setShowImportToken(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <PlusIcon className="h-5 w-5" />
+                Import Token
+              </button>
+            </div>
+
+            {/* Token List */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="divide-y divide-gray-200">
+                {tokens.map((token) => (
+                  <div key={token.address} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium">{token.symbol}</h3>
+                        <p className="text-sm text-gray-500">{token.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">
+                          {token.balance || '0'} {token.symbol}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {token.address.slice(0, 6)}...{token.address.slice(-4)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {tokens.length === 0 && (
+                  <div className="p-8 text-center text-gray-500">
+                    <p>No custom tokens added yet.</p>
+                    <p className="text-sm mt-1">Click "Import Token" to add your first token.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </motion.div>
       </div>
 
@@ -408,6 +488,13 @@ export default function Dashboard() {
         onClose={() => setIsSendModalOpen(false)}
         onSend={handleSendTokens}
         isLoading={isSending}
+      />
+
+      {/* Import Token Modal */}
+      <ImportToken
+        isOpen={showImportToken}
+        onClose={() => setShowImportToken(false)}
+        onImport={handleImportToken}
       />
     </Layout>
   );
