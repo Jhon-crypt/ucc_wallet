@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -10,6 +10,7 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import TokenList from '../components/TokenList';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function Dashboard() {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [pollCount, setPollCount] = useState(0);
-  const [showImportToken, setShowImportToken] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
 
   // Function to fetch balance with retries
@@ -243,11 +244,9 @@ export default function Dashboard() {
   }, [wallet]);
 
   // Handle token import
-  const handleImportToken = async (tokenAddress: string): Promise<TokenInfo> => {
-    if (!wallet) {
-      throw new Error('Wallet not initialized');
-    }
-    const tokenInfo = await wallet.addToken(tokenAddress);
+  const handleImportToken = async (address: string): Promise<TokenInfo> => {
+    if (!wallet) throw new Error('Wallet not initialized');
+    const tokenInfo = await wallet.addToken(address);
     setTokens(wallet.getTokens());
     return tokenInfo;
   };
@@ -280,8 +279,8 @@ export default function Dashboard() {
   }
 
   return (
-    <Layout>
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#0a0a0a]">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -440,7 +439,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Tokens</h2>
               <button
-                onClick={() => setShowImportToken(true)}
+                onClick={() => setIsImportModalOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 <PlusIcon className="h-5 w-5" />
@@ -449,35 +448,10 @@ export default function Dashboard() {
             </div>
 
             {/* Token List */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="divide-y divide-gray-200">
-                {tokens.map((token) => (
-                  <div key={token.address} className="p-4 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium">{token.symbol}</h3>
-                        <p className="text-sm text-gray-500">{token.name}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">
-                          {token.balance || '0'} {token.symbol}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {token.address.slice(0, 6)}...{token.address.slice(-4)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {tokens.length === 0 && (
-                  <div className="p-8 text-center text-gray-500">
-                    <p>No custom tokens added yet.</p>
-                    <p className="text-sm mt-1">Click "Import Token" to add your first token.</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <TokenList 
+              tokens={tokens} 
+              onImportClick={() => setIsImportModalOpen(true)} 
+            />
           </div>
         </motion.div>
       </div>
@@ -492,10 +466,10 @@ export default function Dashboard() {
 
       {/* Import Token Modal */}
       <ImportToken
-        isOpen={showImportToken}
-        onClose={() => setShowImportToken(false)}
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportToken}
       />
-    </Layout>
+    </div>
   );
 } 
