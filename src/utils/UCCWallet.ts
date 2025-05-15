@@ -108,18 +108,30 @@ export class UCCWallet {
     }
 
     try {
+      const code = await this.provider.getCode(tokenAddress);
+      if (code === '0x') {
+        throw new Error('No contract found at this address');
+      }
+
       const contract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
       
       // Try to call basic ERC20 functions to validate the contract
-      await Promise.all([
-        contract.name(),
-        contract.symbol(),
-        contract.decimals()
-      ]);
+      try {
+        await Promise.all([
+          contract.name(),
+          contract.symbol(),
+          contract.decimals()
+        ]);
+      } catch (error) {
+        throw new Error('Invalid ERC20 token contract. The contract does not implement the required functions.');
+      }
 
       return contract;
     } catch (error) {
       console.error('Token validation error:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
       throw new Error('Invalid ERC20 token contract. Please verify the address.');
     }
   }
@@ -127,25 +139,25 @@ export class UCCWallet {
   // Add a new token
   async addToken(tokenAddress: string): Promise<TokenInfo> {
     try {
-      const normalizedAddress = tokenAddress.toLowerCase();
+      const normalizedAddress = ethers.utils.getAddress(tokenAddress); // This ensures checksum address
       
       // Check if token is already added
-      if (this.tokens.has(normalizedAddress)) {
+      if (this.tokens.has(normalizedAddress.toLowerCase())) {
         throw new Error('Token is already imported');
       }
 
       // Validate the token contract
-      const contract = await this.validateTokenContract(tokenAddress);
+      const contract = await this.validateTokenContract(normalizedAddress);
       
       // Get token information
       const [name, symbol, decimals] = await Promise.all([
-        contract.name(),
-        contract.symbol(),
-        contract.decimals()
+        contract.name().catch(() => 'Unknown Token'),
+        contract.symbol().catch(() => 'UNKNOWN'),
+        contract.decimals().catch(() => 18)
       ]);
 
       const tokenInfo: TokenInfo = {
-        address: tokenAddress,
+        address: normalizedAddress,
         name,
         symbol,
         decimals: Number(decimals)
@@ -153,14 +165,19 @@ export class UCCWallet {
 
       // Get initial balance if wallet is connected
       if (this.provider) {
-        const signer = await this.getSigner();
-        const address = await signer.getAddress();
-        const balance = await contract.balanceOf(address);
-        tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
+        try {
+          const signer = await this.getSigner();
+          const address = await signer.getAddress();
+          const balance = await contract.balanceOf(address);
+          tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
+        } catch (error) {
+          console.error('Error fetching initial balance:', error);
+          tokenInfo.balance = '0';
+        }
       }
 
       // Save token
-      this.tokens.set(normalizedAddress, tokenInfo);
+      this.tokens.set(normalizedAddress.toLowerCase(), tokenInfo);
       this.saveTokens();
 
       return tokenInfo;

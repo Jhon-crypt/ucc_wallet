@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { toast } from 'react-hot-toast';
 import { TokenInfo } from '../utils/UCCWallet';
+import { ethers } from 'ethers';
 
 interface ImportTokenProps {
   isOpen: boolean;
@@ -19,18 +20,30 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     setTokenInfo(null); // Reset token info when address changes
   };
 
+  const validateAndFormatAddress = (address: string): string => {
+    // If it's already a valid ETH address, return it
+    if (ethers.utils.isAddress(address)) {
+      return address;
+    }
+
+    // If it's a valid ETH address without '0x' prefix, add it
+    if (ethers.utils.isAddress('0x' + address)) {
+      return '0x' + address;
+    }
+
+    throw new Error('Invalid token contract address format');
+  };
+
   const handleSearch = async () => {
     if (!tokenAddress) return;
     
-    // Basic address validation
-    if (!tokenAddress.startsWith('0x') || tokenAddress.length !== 42) {
-      toast.error('Invalid token address format');
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const info = await onImport(tokenAddress);
+      // Try to validate and format the address
+      const formattedAddress = validateAndFormatAddress(tokenAddress);
+      
+      // Search for token info
+      const info = await onImport(formattedAddress);
       setTokenInfo(info);
       toast.success('Token found! Click Import to add it to your wallet.');
     } catch (err) {
@@ -78,7 +91,7 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
                   type="text"
                   value={tokenAddress}
                   onChange={handleAddressChange}
-                  placeholder="0x..."
+                  placeholder="Enter token contract address"
                   className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
                 <button
@@ -89,6 +102,9 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
                   {isLoading ? 'Searching...' : 'Search'}
                 </button>
               </div>
+              <p className="mt-1 text-sm text-gray-400">
+                Enter the token contract address (with or without '0x' prefix)
+              </p>
             </div>
 
             {/* Token Info */}
@@ -105,6 +121,12 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-300">Decimals:</span>
                   <span className="text-white">{tokenInfo.decimals}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-300">Contract:</span>
+                  <span className="text-white font-mono text-sm">
+                    {tokenInfo.address.slice(0, 6)}...{tokenInfo.address.slice(-4)}
+                  </span>
                 </div>
               </div>
             )}
