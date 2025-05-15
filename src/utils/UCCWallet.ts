@@ -18,6 +18,14 @@ export interface TransactionResult {
   error?: string;
 }
 
+export interface TokenInfo {
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  balance?: string;
+}
+
 interface EthereumRequestParams {
   method: string;
   params?: unknown[];
@@ -35,18 +43,193 @@ declare global {
   }
 }
 
+// Minimal ERC20 ABI for token interactions
+const ERC20_ABI = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function balanceOf(address) view returns (uint256)',
+  'function transfer(address to, uint256 value) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 value) returns (bool)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)'
+];
+
 export class UCCWallet {
   private chainId = 'universe_9000-1';
   private chainName = 'Universe Chain Mainnet';
   private rpcUrl = RPC_API_URL;
   private restUrl = RPC_API_URL;
   private provider: ethers.providers.Web3Provider | null = null;
+  private tokens: Map<string, TokenInfo> = new Map();
 
   constructor() {
     this.rpcUrl = RPC_API_URL;
     this.restUrl = RPC_API_URL;
     if (window.ethereum) {
       this.provider = new ethers.providers.Web3Provider(window.ethereum);
+    }
+    this.loadSavedTokens();
+  }
+
+  // Load saved tokens from localStorage
+  private loadSavedTokens() {
+    try {
+      const savedTokens = localStorage.getItem('customTokens');
+      if (savedTokens) {
+        const tokenList = JSON.parse(savedTokens) as TokenInfo[];
+        tokenList.forEach(token => {
+          this.tokens.set(token.address.toLowerCase(), token);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading saved tokens:', error);
+    }
+  }
+
+  // Save tokens to localStorage
+  private saveTokens() {
+    try {
+      const tokenList = Array.from(this.tokens.values());
+      localStorage.setItem('customTokens', JSON.stringify(tokenList));
+    } catch (error) {
+      console.error('Error saving tokens:', error);
+    }
+  }
+
+  // Add a new token
+  async addToken(tokenAddress: string): Promise<TokenInfo> {
+    try {
+      if (!this.provider) {
+        throw new Error('Provider not initialized');
+      }
+
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
+      
+      // Get token information
+      const [name, symbol, decimals] = await Promise.all([
+        tokenContract.name(),
+        tokenContract.symbol(),
+        tokenContract.decimals()
+      ]);
+
+      const tokenInfo: TokenInfo = {
+        address: tokenAddress,
+        name,
+        symbol,
+        decimals
+      };
+
+      // Save token
+      this.tokens.set(tokenAddress.toLowerCase(), tokenInfo);
+      this.saveTokens();
+
+      return tokenInfo;
+    } catch (error) {
+      console.error('Error adding token:', error);
+      throw new Error('Invalid token address or contract');
+    }
+  }
+
+  // Remove a token
+  removeToken(tokenAddress: string): boolean {
+    const removed = this.tokens.delete(tokenAddress.toLowerCase());
+    if (removed) {
+      this.saveTokens();
+    }
+    return removed;
+  }
+
+  // Get list of added tokens
+  getTokens(): TokenInfo[] {
+    return Array.from(this.tokens.values());
+  }
+
+  // Get token balance
+  async getTokenBalance(tokenAddress: string, walletAddress: string): Promise<string> {
+    try {
+      if (!this.provider) {
+        throw new Error('Provider not initialized');
+      }
+
+      const token = this.tokens.get(tokenAddress.toLowerCase());
+      if (!token) {
+        throw new Error('Token not found');
+      }
+
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
+      const balance = await tokenContract.balanceOf(walletAddress);
+      
+      return ethers.utils.formatUnits(balance, token.decimals);
+    } catch (error) {
+      console.error('Error getting token balance:', error);
+      throw error;
+    }
+  }
+
+  // Send token
+  async sendToken(
+    tokenAddress: string,
+    recipientAddress: string,
+    amount: string
+  ): Promise<TransactionResult> {
+    try {
+      if (!this.provider) {
+        throw new Error('Provider not initialized');
+      }
+
+      const token = this.tokens.get(tokenAddress.toLowerCase());
+      if (!token) {
+        throw new Error('Token not found');
+      }
+
+      // Convert UCC address to ETH address if needed
+      let ethRecipient = recipientAddress;
+      if (recipientAddress.startsWith('ucc')) {
+        ethRecipient = this.uccToEth(recipientAddress);
+      } else if (!recipientAddress.startsWith('0x')) {
+        throw new Error('Invalid address format. Please provide a UCC or ETH address');
+      }
+
+      const signer = await this.getSigner();
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+      
+      // Convert amount to token decimals
+      const value = ethers.utils.parseUnits(amount, token.decimals);
+      
+      // Send transaction
+      const tx = await tokenContract.transfer(ethRecipient, value);
+      console.log('Token transfer submitted:', tx.hash);
+      
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      console.log('Token transfer confirmed:', receipt);
+
+      return {
+        success: true,
+        txHash: tx.hash
+      };
+    } catch (error) {
+      console.error('Error sending token:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send tokens'
+      };
+    }
+  }
+
+  // Update all token balances
+  async updateAllTokenBalances(walletAddress: string): Promise<void> {
+    try {
+      const promises = Array.from(this.tokens.values()).map(async (token) => {
+        const balance = await this.getTokenBalance(token.address, walletAddress);
+        token.balance = balance;
+      });
+
+      await Promise.all(promises);
+      this.saveTokens();
+    } catch (error) {
+      console.error('Error updating token balances:', error);
     }
   }
 
