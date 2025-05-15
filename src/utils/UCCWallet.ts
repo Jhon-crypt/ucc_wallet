@@ -97,52 +97,80 @@ export class UCCWallet {
     }
   }
 
+  // Validate token contract
+  private async validateTokenContract(tokenAddress: string): Promise<ethers.Contract> {
+    if (!this.provider) {
+      throw new Error('Provider not initialized');
+    }
+
+    if (!ethers.utils.isAddress(tokenAddress)) {
+      throw new Error('Invalid token address format');
+    }
+
+    try {
+      const contract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
+      
+      // Try to call basic ERC20 functions to validate the contract
+      await Promise.all([
+        contract.name(),
+        contract.symbol(),
+        contract.decimals()
+      ]);
+
+      return contract;
+    } catch (error) {
+      console.error('Token validation error:', error);
+      throw new Error('Invalid ERC20 token contract. Please verify the address.');
+    }
+  }
+
   // Add a new token
   async addToken(tokenAddress: string): Promise<TokenInfo> {
     try {
-      if (!this.provider) {
-        throw new Error('Provider not initialized');
+      const normalizedAddress = tokenAddress.toLowerCase();
+      
+      // Check if token is already added
+      if (this.tokens.has(normalizedAddress)) {
+        throw new Error('Token is already imported');
       }
 
-      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
+      // Validate the token contract
+      const contract = await this.validateTokenContract(tokenAddress);
       
       // Get token information
       const [name, symbol, decimals] = await Promise.all([
-        tokenContract.name(),
-        tokenContract.symbol(),
-        tokenContract.decimals()
+        contract.name(),
+        contract.symbol(),
+        contract.decimals()
       ]);
 
       const tokenInfo: TokenInfo = {
         address: tokenAddress,
         name,
         symbol,
-        decimals
+        decimals: Number(decimals)
       };
 
+      // Get initial balance if wallet is connected
+      if (this.provider) {
+        const signer = await this.getSigner();
+        const address = await signer.getAddress();
+        const balance = await contract.balanceOf(address);
+        tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
+      }
+
       // Save token
-      this.tokens.set(tokenAddress.toLowerCase(), tokenInfo);
+      this.tokens.set(normalizedAddress, tokenInfo);
       this.saveTokens();
 
       return tokenInfo;
     } catch (error) {
       console.error('Error adding token:', error);
-      throw new Error('Invalid token address or contract');
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to add token');
     }
-  }
-
-  // Remove a token
-  removeToken(tokenAddress: string): boolean {
-    const removed = this.tokens.delete(tokenAddress.toLowerCase());
-    if (removed) {
-      this.saveTokens();
-    }
-    return removed;
-  }
-
-  // Get list of added tokens
-  getTokens(): TokenInfo[] {
-    return Array.from(this.tokens.values());
   }
 
   // Get token balance
@@ -157,14 +185,48 @@ export class UCCWallet {
         throw new Error('Token not found');
       }
 
-      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
-      const balance = await tokenContract.balanceOf(walletAddress);
+      const contract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider);
+      const balance = await contract.balanceOf(walletAddress);
       
       return ethers.utils.formatUnits(balance, token.decimals);
     } catch (error) {
       console.error('Error getting token balance:', error);
       throw error;
     }
+  }
+
+  // Update all token balances
+  async updateAllTokenBalances(walletAddress: string): Promise<void> {
+    try {
+      const promises = Array.from(this.tokens.values()).map(async (token) => {
+        try {
+          const balance = await this.getTokenBalance(token.address, walletAddress);
+          token.balance = balance;
+        } catch (error) {
+          console.error(`Error updating balance for token ${token.symbol}:`, error);
+          token.balance = '0';
+        }
+      });
+
+      await Promise.all(promises);
+      this.saveTokens();
+    } catch (error) {
+      console.error('Error updating token balances:', error);
+    }
+  }
+
+  // Get list of added tokens
+  getTokens(): TokenInfo[] {
+    return Array.from(this.tokens.values());
+  }
+
+  // Remove a token
+  removeToken(tokenAddress: string): boolean {
+    const removed = this.tokens.delete(tokenAddress.toLowerCase());
+    if (removed) {
+      this.saveTokens();
+    }
+    return removed;
   }
 
   // Send token
@@ -215,21 +277,6 @@ export class UCCWallet {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to send tokens'
       };
-    }
-  }
-
-  // Update all token balances
-  async updateAllTokenBalances(walletAddress: string): Promise<void> {
-    try {
-      const promises = Array.from(this.tokens.values()).map(async (token) => {
-        const balance = await this.getTokenBalance(token.address, walletAddress);
-        token.balance = balance;
-      });
-
-      await Promise.all(promises);
-      this.saveTokens();
-    } catch (error) {
-      console.error('Error updating token balances:', error);
     }
   }
 
