@@ -6,7 +6,6 @@ import { ethers } from 'ethers';
 import { UCCWallet, WalletInfo, Balance, TokenInfo } from '../utils/UCCWallet';
 import { SendTokenModal } from '../components/SendTokenModal';
 import ImportToken from '../components/ImportToken';
-import { PlusIcon } from '@heroicons/react/24/outline';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
