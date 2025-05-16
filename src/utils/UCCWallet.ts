@@ -132,7 +132,7 @@ export class UCCWallet {
   }
 
   // Add a new token
-  async addToken(address: string): Promise<TokenInfo> {
+  async addToken(address: string, customName?: string): Promise<TokenInfo> {
     try {
       // Normalize the address
       if (!address.startsWith('0x')) {
@@ -171,10 +171,10 @@ export class UCCWallet {
 
       console.log('Token info retrieved:', { name, symbol, decimals });
 
-      // Create token info
+      // Create token info with custom name if provided
       const tokenInfo: TokenInfo = {
         address,
-        name,
+        name: customName || name,
         symbol,
         decimals,
         balance: '0'
@@ -202,7 +202,7 @@ export class UCCWallet {
       return tokenInfo;
     } catch (error) {
       console.error('Error adding token:', error);
-      throw new Error(`Failed to add token: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
     }
   }
 

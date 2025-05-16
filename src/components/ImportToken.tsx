@@ -7,11 +7,12 @@ import { ethers } from 'ethers';
 interface ImportTokenProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (tokenAddress: string) => Promise<TokenInfo>;
+  onImport: (tokenAddress: string, customName?: string) => Promise<TokenInfo>;
 }
 
 export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenProps) {
   const [tokenAddress, setTokenAddress] = useState('');
+  const [customName, setCustomName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [tokenPreview, setTokenPreview] = useState<TokenInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +20,7 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
 
   const resetState = () => {
     setTokenAddress('');
+    setCustomName('');
     setTokenPreview(null);
     setError(null);
     setIsLoading(false);
@@ -31,6 +33,10 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     setTokenPreview(null);
     setError(null);
     setGeneratedWallet(null);
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomName(e.target.value);
   };
 
   const generateNewWallet = () => {
@@ -60,7 +66,7 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     setIsLoading(true);
     setError(null);
     try {
-      const tokenInfo = await onImport(tokenAddress);
+      const tokenInfo = await onImport(tokenAddress, customName);
       setTokenPreview(tokenInfo);
       generateNewWallet(); // Generate a new wallet when token is found
     } catch (err) {
@@ -77,7 +83,7 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     
     setIsLoading(true);
     try {
-      await onImport(tokenPreview.address);
+      await onImport(tokenPreview.address, customName);
       toast.success(`${tokenPreview.symbol} token imported successfully!`);
       resetState();
       onClose();
@@ -151,6 +157,22 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
               )}
             </div>
 
+            {/* Custom Token Name Input */}
+            <div className="bg-[#111111] rounded-2xl p-6 border border-gray-800">
+              <label className="block text-base font-semibold text-gray-300 mb-3">
+                Custom Token Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={customName}
+                onChange={handleNameChange}
+                placeholder="Enter custom token name"
+                className="w-full rounded-xl border-2 border-gray-800 bg-black px-4 py-3 text-lg text-white placeholder-gray-600 
+                  focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:border-gray-700 transition-colors"
+                disabled={isLoading}
+              />
+            </div>
+
             {/* Token Preview */}
             {tokenPreview && (
               <div className="bg-[#111111] rounded-2xl p-6 border border-gray-800">
@@ -162,7 +184,7 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-gray-800">
                     <span className="text-base font-medium text-gray-400">Token Name</span>
-                    <span className="text-lg text-white">{tokenPreview.name}</span>
+                    <span className="text-lg text-white">{customName || tokenPreview.name}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-gray-800">
                     <span className="text-base font-medium text-gray-400">Decimals</span>
