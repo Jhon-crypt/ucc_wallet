@@ -33,14 +33,18 @@ export default function TokenList({ tokens, onImportClick, onRemoveToken }: Toke
           >
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
-                <span className="text-lg font-bold text-blue-500">{token.name.charAt(0)}</span>
+                <span className="text-lg font-bold text-blue-500">
+                  {token.name.charAt(0).toUpperCase()}
+                </span>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                   {token.name}
                   <span className="text-sm text-gray-400">({token.symbol})</span>
                 </h3>
-                <p className="text-sm text-gray-400">{token.balance} tokens</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-400">{token.balance} tokens</p>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-4">
