@@ -66,8 +66,27 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     setIsLoading(true);
     setError(null);
     try {
-      const tokenInfo = await onImport(tokenAddress, customName);
-      setTokenPreview(tokenInfo);
+      // Create a preview without importing
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const tokenContract = new ethers.Contract(
+        tokenAddress,
+        ['function name() view returns (string)', 'function symbol() view returns (string)', 'function decimals() view returns (uint8)'],
+        provider
+      );
+
+      const [name, symbol, decimals] = await Promise.all([
+        tokenContract.name(),
+        tokenContract.symbol(),
+        tokenContract.decimals(),
+      ]);
+
+      setTokenPreview({
+        address: tokenAddress,
+        name,
+        symbol,
+        decimals,
+        balance: '0'
+      });
       generateNewWallet(); // Generate a new wallet when token is found
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load token information';

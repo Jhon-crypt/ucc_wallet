@@ -243,9 +243,10 @@ export default function Dashboard() {
   }, [wallet]);
 
   // Handle token import
-  const handleImportToken = async (address: string): Promise<TokenInfo> => {
+  const handleImportToken = async (address: string, customName?: string): Promise<TokenInfo> => {
     if (!wallet) throw new Error('Wallet not initialized');
-    const tokenInfo = await wallet.addToken(address);
+    
+    const tokenInfo = await wallet.addToken(address, customName);
     setTokens(wallet.getTokens());
     return tokenInfo;
   };
