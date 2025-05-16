@@ -264,6 +264,18 @@ export default function Dashboard() {
     }
   }, [wallet, walletInfo]);
 
+  // Handle token removal
+  const handleRemoveToken = (address: string) => {
+    if (!wallet) return;
+    
+    if (wallet.removeToken(address)) {
+      setTokens(wallet.getTokens());
+      toast.success('Token removed successfully');
+    } else {
+      toast.error('Failed to remove token');
+    }
+  };
+
   if (!walletInfo) {
     return (
       <Layout>
@@ -438,6 +450,7 @@ export default function Dashboard() {
             <TokenList 
               tokens={tokens} 
               onImportClick={() => setIsImportModalOpen(true)} 
+              onRemoveToken={handleRemoveToken}
             />
           </div>
         </motion.div>
