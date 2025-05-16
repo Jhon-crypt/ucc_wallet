@@ -67,8 +67,8 @@ export class UCCWallet {
     if (window.ethereum) {
       this.provider = new ethers.providers.Web3Provider(window.ethereum);
     }
-    // Initialize RPC provider for token contract interactions
-    this.rpcProvider = new ethers.providers.JsonRpcProvider(RPC_API_URL);
+    // Initialize RPC provider for Ethereum mainnet
+    this.rpcProvider = new ethers.providers.JsonRpcProvider('https://eth-mainnet.g.alchemy.com/v2/demo');
     this.loadSavedTokens();
   }
 
@@ -132,72 +132,96 @@ export class UCCWallet {
   }
 
   // Add a new token
-  async addToken(tokenAddress: string): Promise<TokenInfo> {
+  async addToken(address: string): Promise<TokenInfo> {
     try {
-      // Clean and validate the address
-      let normalizedAddress = tokenAddress.trim();
-      if (!normalizedAddress.startsWith('0x')) {
-        normalizedAddress = '0x' + normalizedAddress;
+      // Normalize the address
+      if (!address.startsWith('0x')) {
+        address = '0x' + address;
       }
       
       // Validate address format
-      try {
-        normalizedAddress = ethers.utils.getAddress(normalizedAddress);
-      } catch (error) {
+      if (!ethers.utils.isAddress(address)) {
         throw new Error('Invalid token address format');
       }
-      
-      // Check if token is already added
-      if (this.tokens.has(normalizedAddress.toLowerCase())) {
-        throw new Error('Token is already imported');
+
+      // Check if token already exists
+      const existingToken = this.tokens.get(address.toLowerCase());
+      if (existingToken) {
+        return existingToken;
       }
 
-      console.log('Validating token contract at address:', normalizedAddress);
-      
-      // Validate the token contract
-      const contract = await this.validateTokenContract(normalizedAddress);
-      
-      // Get token information
+      // Create contract instance with minimal ABI for ERC20 tokens
+      const minimalABI = [
+        'function name() view returns (string)',
+        'function symbol() view returns (string)',
+        'function decimals() view returns (uint8)',
+        'function balanceOf(address) view returns (uint256)'
+      ];
+
+      console.log('Creating contract instance for address:', address);
+      // Use Ethereum mainnet provider instead of Universe Chain provider
+      const contract = new ethers.Contract(address, minimalABI, this.rpcProvider);
+
+      // Try to get token information with timeout and error handling
       const [name, symbol, decimals] = await Promise.all([
-        contract.name().catch(() => 'Unknown Token'),
-        contract.symbol().catch(() => 'UNKNOWN'),
-        contract.decimals().catch(() => 18)
+        this._safeContractCall(() => contract.name(), 'Unknown'),
+        this._safeContractCall(() => contract.symbol(), 'UNKNOWN'),
+        this._safeContractCall(() => contract.decimals(), 18)
       ]);
 
       console.log('Token info retrieved:', { name, symbol, decimals });
 
+      // Create token info
       const tokenInfo: TokenInfo = {
-        address: normalizedAddress,
+        address,
         name,
         symbol,
-        decimals: Number(decimals)
+        decimals,
+        balance: '0'
       };
 
-      // Get initial balance if wallet is connected
+      // Add to tokens list
+      this.tokens.set(address.toLowerCase(), tokenInfo);
+      
+      // Try to get initial balance if we have a connected wallet
       if (this.provider) {
         try {
           const signer = await this.getSigner();
           const address = await signer.getAddress();
           const balance = await contract.balanceOf(address);
           tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
-          console.log('Initial token balance:', tokenInfo.balance);
         } catch (error) {
-          console.error('Error fetching initial balance:', error);
+          console.warn('Failed to get initial balance:', error);
           tokenInfo.balance = '0';
         }
       }
 
-      // Save token
-      this.tokens.set(normalizedAddress.toLowerCase(), tokenInfo);
+      // Save tokens to localStorage
       this.saveTokens();
 
       return tokenInfo;
     } catch (error) {
       console.error('Error adding token:', error);
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Failed to add token');
+      throw new Error(`Failed to add token: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Helper method to safely call contract methods with timeout
+  private async _safeContractCall<T>(
+    call: () => Promise<T>,
+    defaultValue: T
+  ): Promise<T> {
+    try {
+      const result = await Promise.race([
+        call(),
+        new Promise<T>((_, reject) => 
+          setTimeout(() => reject(new Error('Contract call timeout')), 5000)
+        )
+      ]) as T;
+      return result;
+    } catch (error) {
+      console.warn('Contract call failed:', error);
+      return defaultValue;
     }
   }
 

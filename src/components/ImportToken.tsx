@@ -13,51 +13,77 @@ interface ImportTokenProps {
 export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenProps) {
   const [tokenAddress, setTokenAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
-  const [searchedAddress, setSearchedAddress] = useState('');
+  const [tokenPreview, setTokenPreview] = useState<TokenInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [generatedWallet, setGeneratedWallet] = useState<{address: string; privateKey: string} | null>(null);
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTokenAddress(e.target.value.trim());
-    setTokenInfo(null); // Reset token info when address changes
+  const resetState = () => {
+    setTokenAddress('');
+    setTokenPreview(null);
+    setError(null);
+    setIsLoading(false);
+    setGeneratedWallet(null);
   };
 
-  const handleSearch = async () => {
-    if (!tokenAddress) return;
-    
-    setIsLoading(true);
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.trim();
+    setTokenAddress(value);
+    setTokenPreview(null);
+    setError(null);
+    setGeneratedWallet(null);
+  };
+
+  const generateNewWallet = () => {
+    const wallet = ethers.Wallet.createRandom();
+    setGeneratedWallet({
+      address: wallet.address,
+      privateKey: wallet.privateKey
+    });
+  };
+
+  const validateAddress = (address: string): boolean => {
     try {
-      console.log('Searching for token:', tokenAddress);
-      const info = await onImport(tokenAddress);
-      console.log('Token found:', info);
-      setTokenInfo(info);
-      setSearchedAddress(tokenAddress);
-      toast.success('Token found! Click Import to add it to your wallet.');
+      const normalizedAddress = address.startsWith('0x') ? address : `0x${address}`;
+      return ethers.utils.isAddress(normalizedAddress);
+    } catch {
+      return false;
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!tokenAddress || isLoading) return;
+    if (!validateAddress(tokenAddress)) {
+      setError('Invalid token address format');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const tokenInfo = await onImport(tokenAddress);
+      setTokenPreview(tokenInfo);
+      generateNewWallet(); // Generate a new wallet when token is found
     } catch (err) {
-      const error = err as Error;
-      console.error('Token search error:', error);
-      toast.error(error.message || 'Invalid token address or contract');
-      setTokenInfo(null);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load token information';
+      setError(errorMessage);
+      setTokenPreview(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleImport = async () => {
-    if (!tokenInfo || !searchedAddress) return;
-
+    if (!tokenPreview || isLoading) return;
+    
     setIsLoading(true);
     try {
-      console.log('Importing token:', searchedAddress);
-      await onImport(searchedAddress);
-      toast.success(`${tokenInfo.symbol} token imported successfully!`);
-      setTokenAddress('');
-      setTokenInfo(null);
-      setSearchedAddress('');
+      await onImport(tokenPreview.address);
+      toast.success(`${tokenPreview.symbol} token imported successfully!`);
+      resetState();
       onClose();
     } catch (err) {
-      const error = err as Error;
-      console.error('Token import error:', error);
-      toast.error(error.message || 'Failed to import token');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to import token';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -65,92 +91,169 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isLoading) {
-      handleSearch();
+      handlePreview();
     }
   };
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-      <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/90" aria-hidden="true" />
       
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-md rounded-xl bg-gray-900 p-6 shadow-xl border border-gray-800">
-          <Dialog.Title className="text-xl font-bold mb-4 text-white">
-            Import Token
+        <Dialog.Panel className="w-full max-w-2xl rounded-3xl bg-[#0a0a0a] p-8 shadow-2xl border border-gray-800">
+          <Dialog.Title className="text-2xl font-bold mb-8 text-white flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
+              </svg>
+              Import Token
+            </div>
+            <button 
+              onClick={onClose}
+              className="text-gray-500 hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </Dialog.Title>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Token Address Input */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
+            <div className="bg-[#111111] rounded-2xl p-6 border border-gray-800">
+              <label className="block text-base font-semibold text-gray-300 mb-3">
                 Token Contract Address
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <input
                   type="text"
                   value={tokenAddress}
                   onChange={handleAddressChange}
                   onKeyPress={handleKeyPress}
-                  placeholder="Enter token contract address"
-                  className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  placeholder="Enter token contract address (0x...)"
+                  className="flex-1 rounded-xl border-2 border-gray-800 bg-black px-4 py-3 text-lg text-white placeholder-gray-600 
+                    focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:border-gray-700 transition-colors"
+                  disabled={isLoading}
                 />
                 <button
-                  onClick={handleSearch}
+                  onClick={handlePreview}
                   disabled={!tokenAddress || isLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-blue-600 text-white text-lg font-medium rounded-xl hover:bg-blue-700 
+                    disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 min-w-[120px]
+                    hover:shadow-lg hover:shadow-blue-500/20"
                 >
-                  {isLoading ? 'Searching...' : 'Search'}
+                  {isLoading ? 'Loading...' : 'Preview'}
                 </button>
               </div>
-              <p className="mt-1 text-sm text-gray-400">
-                Enter the token contract address (with or without '0x' prefix)
-              </p>
+              {error && (
+                <p className="mt-2 text-sm font-medium text-red-400">{error}</p>
+              )}
             </div>
 
-            {/* Token Info */}
-            {tokenInfo && (
-              <div className="border border-gray-700 rounded-lg p-4 space-y-2 bg-gray-800">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-300">Token Symbol:</span>
-                  <span className="text-white">{tokenInfo.symbol}</span>
+            {/* Token Preview */}
+            {tokenPreview && (
+              <div className="bg-[#111111] rounded-2xl p-6 border border-gray-800">
+                <h3 className="text-lg font-semibold text-white mb-4">Token Information</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-800">
+                    <span className="text-base font-medium text-gray-400">Token Symbol</span>
+                    <span className="text-lg font-bold text-white">{tokenPreview.symbol}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-800">
+                    <span className="text-base font-medium text-gray-400">Token Name</span>
+                    <span className="text-lg text-white">{tokenPreview.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-gray-800">
+                    <span className="text-base font-medium text-gray-400">Decimals</span>
+                    <span className="text-lg text-white">{tokenPreview.decimals}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-base font-medium text-gray-400">Contract</span>
+                    <a 
+                      href={`https://etherscan.io/token/${tokenPreview.address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 font-mono text-base hover:underline transition-colors"
+                    >
+                      {tokenPreview.address.slice(0, 6)}...{tokenPreview.address.slice(-4)}
+                    </a>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-300">Token Name:</span>
-                  <span className="text-white">{tokenInfo.name}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-300">Decimals:</span>
-                  <span className="text-white">{tokenInfo.decimals}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-300">Contract:</span>
-                  <span className="text-white font-mono text-sm">
-                    {tokenInfo.address.slice(0, 6)}...{tokenInfo.address.slice(-4)}
-                  </span>
+              </div>
+            )}
+
+            {/* Generated Wallet */}
+            {generatedWallet && (
+              <div className="bg-[#111111] rounded-2xl p-6 border border-gray-800">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  Generated Wallet
+                </h3>
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-black/50 p-4 border border-gray-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-400">Wallet Address</span>
+                      <button 
+                        onClick={() => navigator.clipboard.writeText(generatedWallet.address)}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="font-mono text-sm text-white break-all">{generatedWallet.address}</p>
+                  </div>
+                  <div className="rounded-lg bg-black/50 p-4 border border-gray-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-400">Private Key</span>
+                      <button 
+                        onClick={() => navigator.clipboard.writeText(generatedWallet.privateKey)}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="font-mono text-sm text-white break-all">{generatedWallet.privateKey}</p>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Warning */}
-            <div className="text-sm text-yellow-500 bg-yellow-900/50 p-3 rounded-lg border border-yellow-800/50">
-              <p>Anyone can create a token, including fake versions of existing tokens. Learn about scams and security risks before adding custom tokens.</p>
+            <div className="bg-red-900/10 border-l-4 border-red-500 p-4 rounded-r-xl">
+              <p className="flex items-start gap-3 text-red-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 flex-shrink-0 mt-0.5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm leading-relaxed">
+                  Store your private key securely. Never share it with anyone. Anyone with your private key can access your tokens.
+                  Make sure to verify the token contract on Etherscan before importing.
+                </span>
+              </p>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-800">
               <button
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800"
+                className="px-6 py-3 border-2 border-gray-800 text-gray-300 text-base font-medium rounded-xl 
+                  hover:bg-gray-900 hover:border-gray-700 transition-colors"
+                disabled={isLoading}
               >
                 Cancel
               </button>
-              <button
-                onClick={handleImport}
-                disabled={!tokenInfo || isLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Importing...' : 'Import Token'}
-              </button>
+              {tokenPreview && (
+                <button
+                  onClick={handleImport}
+                  disabled={isLoading}
+                  className="px-6 py-3 bg-blue-600 text-white text-base font-medium rounded-xl hover:bg-blue-700 
+                    disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:shadow-lg hover:shadow-blue-500/20"
+                >
+                  {isLoading ? 'Importing...' : 'Import Token'}
+                </button>
+              )}
             </div>
           </div>
         </Dialog.Panel>
