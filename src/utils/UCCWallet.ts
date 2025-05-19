@@ -160,6 +160,8 @@ export class UCCWallet {
       const NAME_SIG = '0x06fdde03';      // bytes4(keccak256('name()'))
       const SYMBOL_SIG = '0x95d89b41';    // bytes4(keccak256('symbol()'))
       const DECIMALS_SIG = '0x313ce567';  // bytes4(keccak256('decimals()'))
+      const BYTES32_NAME_SIG = '0xa3f4df7e'; // bytes4(keccak256('NAME()'))
+      const BYTES32_SYMBOL_SIG = '0xb76a7f31'; // bytes4(keccak256('SYMBOL()'))
 
       // Try to get token information with fallbacks using low-level calls
       let name = 'Unknown Token';
@@ -167,12 +169,24 @@ export class UCCWallet {
       let decimals = 18;
 
       try {
-        // Try direct call for name
-        const nameData = await this.rpcProvider.call({
+        // Try standard string name() first
+        let nameData = await this.rpcProvider.call({
           to: address,
           data: NAME_SIG
         });
-        if (nameData && nameData !== '0x') {
+
+        if (!nameData || nameData === '0x') {
+          // Try bytes32 NAME() as fallback
+          nameData = await this.rpcProvider.call({
+            to: address,
+            data: BYTES32_NAME_SIG
+          });
+          if (nameData && nameData !== '0x') {
+            // Remove trailing zeros from bytes32
+            name = ethers.utils.parseBytes32String(nameData);
+          }
+        } else {
+          // Decode standard string name
           const decodedName = ethers.utils.defaultAbiCoder.decode(['string'], nameData)[0];
           if (decodedName) name = decodedName;
         }
@@ -181,12 +195,24 @@ export class UCCWallet {
       }
 
       try {
-        // Try direct call for symbol
-        const symbolData = await this.rpcProvider.call({
+        // Try standard string symbol() first
+        let symbolData = await this.rpcProvider.call({
           to: address,
           data: SYMBOL_SIG
         });
-        if (symbolData && symbolData !== '0x') {
+
+        if (!symbolData || symbolData === '0x') {
+          // Try bytes32 SYMBOL() as fallback
+          symbolData = await this.rpcProvider.call({
+            to: address,
+            data: BYTES32_SYMBOL_SIG
+          });
+          if (symbolData && symbolData !== '0x') {
+            // Remove trailing zeros from bytes32
+            symbol = ethers.utils.parseBytes32String(symbolData);
+          }
+        } else {
+          // Decode standard string symbol
           const decodedSymbol = ethers.utils.defaultAbiCoder.decode(['string'], symbolData)[0];
           if (decodedSymbol) symbol = decodedSymbol;
         }
@@ -195,7 +221,7 @@ export class UCCWallet {
       }
 
       try {
-        // Try direct call for decimals
+        // Try to get decimals
         const decimalsData = await this.rpcProvider.call({
           to: address,
           data: DECIMALS_SIG
@@ -227,14 +253,15 @@ export class UCCWallet {
         try {
           const signer = await this.getSigner();
           const walletAddress = await signer.getAddress();
-          // Create minimal contract just for balance check
-          const contract = new ethers.Contract(
-            address,
-            ['function balanceOf(address) view returns (uint256)'],
-            this.provider
-          );
-          const balance = await contract.balanceOf(walletAddress);
-          tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
+          const BALANCE_OF_SIG = '0x70a08231000000000000000000000000' + walletAddress.slice(2);
+          const balanceData = await this.rpcProvider.call({
+            to: address,
+            data: BALANCE_OF_SIG
+          });
+          if (balanceData && balanceData !== '0x') {
+            const balance = ethers.BigNumber.from(balanceData);
+            tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
+          }
         } catch (error) {
           console.warn('Failed to get initial balance:', error);
           tokenInfo.balance = '0';
