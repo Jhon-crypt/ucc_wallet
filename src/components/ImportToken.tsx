@@ -66,8 +66,11 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     setIsLoading(true);
     setError(null);
     try {
-      // Create a preview without importing
-      const provider = new ethers.providers.JsonRpcProvider('https://eth-mainnet.g.alchemy.com/v2/demo');
+      // Use Infura as backup if window.ethereum is not available
+      const provider = window.ethereum 
+        ? new ethers.providers.Web3Provider(window.ethereum)
+        : new ethers.providers.JsonRpcProvider('https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161');
+      
       const normalizedAddress = tokenAddress.startsWith('0x') ? tokenAddress : `0x${tokenAddress}`;
       
       // First check if there's contract code at the address
@@ -86,20 +89,25 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
         provider
       );
 
-      const [name, symbol, decimals] = await Promise.all([
-        tokenContract.name().catch(() => 'Unknown Token'),
-        tokenContract.symbol().catch(() => 'UNKNOWN'),
-        tokenContract.decimals().catch(() => 18)
-      ]);
+      try {
+        const [name, symbol, decimals] = await Promise.all([
+          tokenContract.name().catch(() => 'Unknown Token'),
+          tokenContract.symbol().catch(() => 'UNKNOWN'),
+          tokenContract.decimals().catch(() => 18)
+        ]);
 
-      setTokenPreview({
-        address: normalizedAddress,
-        name: customName || name,
-        symbol,
-        decimals,
-        balance: '0'
-      });
-      generateNewWallet();
+        setTokenPreview({
+          address: normalizedAddress,
+          name: customName || name,
+          symbol,
+          decimals,
+          balance: '0'
+        });
+        generateNewWallet();
+      } catch (contractErr) {
+        console.error('Contract call error:', contractErr);
+        throw new Error('Failed to read token information. Please verify the contract address.');
+      }
     } catch (err) {
       console.error('Token preview error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load token information';
