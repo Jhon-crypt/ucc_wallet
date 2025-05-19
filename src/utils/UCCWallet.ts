@@ -156,40 +156,56 @@ export class UCCWallet {
         throw new Error('No contract found at this address');
       }
 
-      // Create contract instance with minimal ABI for ERC20 tokens
-      const contract = new ethers.Contract(address, [
-        'function name() view returns (string)',
-        'function symbol() view returns (string)',
-        'function decimals() view returns (uint8)',
-        'function balanceOf(address) view returns (uint256)'
-      ], this.rpcProvider);
+      // Function signatures for direct calls
+      const NAME_SIG = '0x06fdde03';      // bytes4(keccak256('name()'))
+      const SYMBOL_SIG = '0x95d89b41';    // bytes4(keccak256('symbol()'))
+      const DECIMALS_SIG = '0x313ce567';  // bytes4(keccak256('decimals()'))
 
-      console.log('Creating contract instance for address:', address);
-
-      // Try to get token information with fallbacks
-      let name: string;
-      let symbol: string;
-      let decimals: number;
+      // Try to get token information with fallbacks using low-level calls
+      let name = 'Unknown Token';
+      let symbol = 'UNKNOWN';
+      let decimals = 18;
 
       try {
-        name = await contract.name();
+        // Try direct call for name
+        const nameData = await this.rpcProvider.call({
+          to: address,
+          data: NAME_SIG
+        });
+        if (nameData && nameData !== '0x') {
+          const decodedName = ethers.utils.defaultAbiCoder.decode(['string'], nameData)[0];
+          if (decodedName) name = decodedName;
+        }
       } catch (error) {
         console.warn('Failed to get token name:', error);
-        name = 'Unknown Token';
       }
 
       try {
-        symbol = await contract.symbol();
+        // Try direct call for symbol
+        const symbolData = await this.rpcProvider.call({
+          to: address,
+          data: SYMBOL_SIG
+        });
+        if (symbolData && symbolData !== '0x') {
+          const decodedSymbol = ethers.utils.defaultAbiCoder.decode(['string'], symbolData)[0];
+          if (decodedSymbol) symbol = decodedSymbol;
+        }
       } catch (error) {
         console.warn('Failed to get token symbol:', error);
-        symbol = 'UNKNOWN';
       }
 
       try {
-        decimals = await contract.decimals();
+        // Try direct call for decimals
+        const decimalsData = await this.rpcProvider.call({
+          to: address,
+          data: DECIMALS_SIG
+        });
+        if (decimalsData && decimalsData !== '0x') {
+          const decodedDecimals = ethers.utils.defaultAbiCoder.decode(['uint8'], decimalsData)[0];
+          if (typeof decodedDecimals === 'number') decimals = decodedDecimals;
+        }
       } catch (error) {
         console.warn('Failed to get token decimals:', error);
-        decimals = 18; // Default to 18 decimals
       }
 
       console.log('Token info retrieved:', { name, symbol, decimals });
@@ -211,6 +227,12 @@ export class UCCWallet {
         try {
           const signer = await this.getSigner();
           const walletAddress = await signer.getAddress();
+          // Create minimal contract just for balance check
+          const contract = new ethers.Contract(
+            address,
+            ['function balanceOf(address) view returns (uint256)'],
+            this.provider
+          );
           const balance = await contract.balanceOf(walletAddress);
           tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
         } catch (error) {
