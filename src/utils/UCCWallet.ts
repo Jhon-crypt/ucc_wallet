@@ -150,24 +150,47 @@ export class UCCWallet {
         return existingToken;
       }
 
+      // First verify the contract exists
+      const code = await this.rpcProvider.getCode(address);
+      if (code === '0x') {
+        throw new Error('No contract found at this address');
+      }
+
       // Create contract instance with minimal ABI for ERC20 tokens
-      const minimalABI = [
+      const contract = new ethers.Contract(address, [
         'function name() view returns (string)',
         'function symbol() view returns (string)',
         'function decimals() view returns (uint8)',
         'function balanceOf(address) view returns (uint256)'
-      ];
+      ], this.rpcProvider);
 
       console.log('Creating contract instance for address:', address);
-      // Use Ethereum mainnet provider instead of Universe Chain provider
-      const contract = new ethers.Contract(address, minimalABI, this.rpcProvider);
 
-      // Try to get token information with timeout and error handling
-      const [name, symbol, decimals] = await Promise.all([
-        this._safeContractCall(() => contract.name(), 'Unknown'),
-        this._safeContractCall(() => contract.symbol(), 'UNKNOWN'),
-        this._safeContractCall(() => contract.decimals(), 18)
-      ]);
+      // Try to get token information with fallbacks
+      let name: string;
+      let symbol: string;
+      let decimals: number;
+
+      try {
+        name = await contract.name();
+      } catch (error) {
+        console.warn('Failed to get token name:', error);
+        name = 'Unknown Token';
+      }
+
+      try {
+        symbol = await contract.symbol();
+      } catch (error) {
+        console.warn('Failed to get token symbol:', error);
+        symbol = 'UNKNOWN';
+      }
+
+      try {
+        decimals = await contract.decimals();
+      } catch (error) {
+        console.warn('Failed to get token decimals:', error);
+        decimals = 18; // Default to 18 decimals
+      }
 
       console.log('Token info retrieved:', { name, symbol, decimals });
 
@@ -187,8 +210,8 @@ export class UCCWallet {
       if (this.provider) {
         try {
           const signer = await this.getSigner();
-          const address = await signer.getAddress();
-          const balance = await contract.balanceOf(address);
+          const walletAddress = await signer.getAddress();
+          const balance = await contract.balanceOf(walletAddress);
           tokenInfo.balance = ethers.utils.formatUnits(balance, decimals);
         } catch (error) {
           console.warn('Failed to get initial balance:', error);
