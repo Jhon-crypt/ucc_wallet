@@ -47,38 +47,30 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
     });
   };
 
-  const validateAddress = (address: string): boolean => {
-    try {
-      const normalizedAddress = address.startsWith('0x') ? address : `0x${address}`;
-      return ethers.utils.isAddress(normalizedAddress);
-    } catch {
-      return false;
-    }
-  };
-
   const handlePreview = async () => {
     if (!tokenAddress || isLoading) return;
-    if (!validateAddress(tokenAddress)) {
-      setError('Invalid token address format');
-      return;
-    }
 
     setIsLoading(true);
     setError(null);
     try {
-      // Use Infura as backup if window.ethereum is not available
-      const provider = window.ethereum 
-        ? new ethers.providers.Web3Provider(window.ethereum)
-        : new ethers.providers.JsonRpcProvider('https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161');
-      
+      // Normalize the address
       const normalizedAddress = tokenAddress.startsWith('0x') ? tokenAddress : `0x${tokenAddress}`;
       
-      // First check if there's contract code at the address
-      const code = await provider.getCode(normalizedAddress);
+      // Validate address format first
+      if (!ethers.utils.isAddress(normalizedAddress)) {
+        throw new Error('Invalid token address format');
+      }
+
+      // Use Ethereum mainnet provider for validation
+      const provider = new ethers.providers.JsonRpcProvider('https://eth-mainnet.g.alchemy.com/v2/demo');
+      
+      // Check if there's contract code at the address
+      const code = await provider.getCode(normalizedAddress).catch(() => '0x');
       if (code === '0x') {
         throw new Error('No contract found at this address');
       }
 
+      // Create contract instance
       const tokenContract = new ethers.Contract(
         normalizedAddress,
         [
@@ -89,25 +81,24 @@ export default function ImportToken({ isOpen, onClose, onImport }: ImportTokenPr
         provider
       );
 
-      try {
-        const [name, symbol, decimals] = await Promise.all([
-          tokenContract.name().catch(() => 'Unknown Token'),
-          tokenContract.symbol().catch(() => 'UNKNOWN'),
-          tokenContract.decimals().catch(() => 18)
-        ]);
+      // Get token information
+      const [name, symbol, decimals] = await Promise.all([
+        tokenContract.name().catch(() => 'Unknown Token'),
+        tokenContract.symbol().catch(() => 'UNKNOWN'),
+        tokenContract.decimals().catch(() => 18)
+      ]);
 
-        setTokenPreview({
-          address: normalizedAddress,
-          name: customName || name,
-          symbol,
-          decimals,
-          balance: '0'
-        });
-        generateNewWallet();
-      } catch (contractErr) {
-        console.error('Contract call error:', contractErr);
-        throw new Error('Failed to read token information. Please verify the contract address.');
-      }
+      // Set token preview
+      setTokenPreview({
+        address: normalizedAddress,
+        name: customName || name,
+        symbol,
+        decimals,
+        balance: '0'
+      });
+
+      // Generate wallet for the token
+      generateNewWallet();
     } catch (err) {
       console.error('Token preview error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load token information';
